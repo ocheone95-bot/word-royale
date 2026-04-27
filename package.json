@@ -1,0 +1,13 @@
+{
+  "name": "word-royale",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Word Royale — Telegram Mini App. Casual word puzzle with daily challenge and global leaderboard.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  }
+}
