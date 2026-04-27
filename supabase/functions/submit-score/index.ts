@@ -191,19 +191,46 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { error: sessionErr } = await supabase.from('game_sessions').insert({
-    user_id: userRow.id,
-    daily_seed: todaySeed,
-    letters: expectedLetters.join(''),
-    score: expectedScore,
-    words_found: normalized,
-    duration_sec: durationSec,
+  // Rate-limit «1 игра в день» + расход replay-токена решаются атомарно
+  // в Postgres функции (миграция 0004). Возвращает result_code='no_replay',
+  // если юзер уже играл сегодня и кредитов нет.
+  const { data: rpcData, error: rpcErr } = await supabase.rpc('insert_game_session', {
+    p_user_id: userRow.id,
+    p_daily_seed: todaySeed,
+    p_letters: expectedLetters.join(''),
+    p_score: expectedScore,
+    p_words_found: normalized,
+    p_duration_sec: durationSec,
   });
-  if (sessionErr) {
+  if (rpcErr) {
     return jsonResponse(500, {
       ok: false,
       error: 'session_insert_failed',
-      detail: sessionErr.message,
+      detail: rpcErr.message,
+    });
+  }
+  const row = Array.isArray(rpcData) && rpcData.length > 0 ? rpcData[0] : null;
+  if (!row || typeof row !== 'object') {
+    return jsonResponse(500, { ok: false, error: 'session_insert_failed', detail: 'no row' });
+  }
+  const result = row as {
+    session_id: string | null;
+    was_replay: boolean | null;
+    replay_credits_left: number | null;
+    result_code: string;
+  };
+  if (result.result_code === 'no_replay') {
+    return jsonResponse(403, {
+      ok: false,
+      error: 'no_replay',
+      message: 'You already played today. Buy a replay to play again.',
+    });
+  }
+  if (result.result_code !== 'ok') {
+    return jsonResponse(500, {
+      ok: false,
+      error: 'session_insert_failed',
+      detail: result.result_code,
     });
   }
 
@@ -212,5 +239,7 @@ Deno.serve(async (req) => {
     score: expectedScore,
     wordsCount: normalized.length,
     seed: todaySeed,
+    wasReplay: result.was_replay ?? false,
+    replayCreditsLeft: result.replay_credits_left ?? 0,
   });
 });
