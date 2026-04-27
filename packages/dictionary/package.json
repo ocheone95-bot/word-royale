@@ -10,6 +10,10 @@
     "./data": "./data/english.json"
   },
   "scripts": {
-    "build:data": "node scripts/build-dictionary.mjs"
+    "build:data": "node scripts/build-dictionary.mjs",
+    "seed:db": "node scripts/seed-db.mjs"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.45.4"
   }
 }
