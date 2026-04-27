@@ -14,7 +14,8 @@
     "@word-royale/dictionary": "*",
     "@word-royale/shared": "*",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

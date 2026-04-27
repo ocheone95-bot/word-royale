@@ -3,6 +3,8 @@
 
 import { Component, type ReactNode } from 'react'
 import HomeScreen from './screens/HomeScreen'
+import GameScreen from './screens/GameScreen'
+import { useGameStore } from './store/useGameStore'
 
 type State = { hasError: boolean }
 
@@ -32,10 +34,16 @@ function OpenInTelegramFallback() {
   )
 }
 
+function ActiveScreen() {
+  const screen = useGameStore((s) => s.screen)
+  if (screen === 'game') return <GameScreen />
+  return <HomeScreen />
+}
+
 export default function App() {
   return (
     <TelegramErrorBoundary>
-      <HomeScreen />
+      <ActiveScreen />
     </TelegramErrorBoundary>
   )
 }

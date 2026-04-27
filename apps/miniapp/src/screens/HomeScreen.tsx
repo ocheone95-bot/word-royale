@@ -1,14 +1,16 @@
 // Главный экран Mini App. Показывает приветствие с именем юзера из Telegram
-// и кнопку Play. Игровая логика подключится на Неделе 2.
+// и кнопку Play, которая переводит в игровой экран.
 
 import { useTelegramUser } from '../hooks/useTelegramUser'
+import { useGameStore } from '../store/useGameStore'
 
 export default function HomeScreen() {
   const user = useTelegramUser()
+  const setScreen = useGameStore((s) => s.setScreen)
   const greeting = user?.firstName ? `Hello, ${user.firstName}!` : 'Hello!'
 
   const handlePlay = () => {
-    console.log('Play pressed')
+    setScreen('game')
   }
 
   return (
