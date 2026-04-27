@@ -1,16 +1,101 @@
-// Глобальный стейт игры. Сейчас содержит только навигацию между экранами,
-// на следующих шагах добавятся выбранные буквы, найденные слова, скор и таймер.
+// Глобальный стейт игры — навигация, текущая партия, выбор букв, результат.
+// Таймер подключится отдельным шагом.
 
 import { create } from 'zustand'
+import {
+  calculateScore,
+  getDailyLetters,
+  getTodaySeed,
+  MIN_WORD_LENGTH,
+  type DailySeed,
+  type Letters,
+} from '@word-royale/shared'
 
 export type Screen = 'home' | 'game' | 'result'
+export type Feedback = null | 'success' | 'invalid' | 'duplicate' | 'too-short'
 
 interface GameState {
   screen: Screen
-  setScreen: (screen: Screen) => void
+
+  // текущая партия
+  seed: DailySeed
+  letters: Letters
+  selectedIndices: number[]
+  foundWords: string[]
+  score: number
+  feedback: Feedback
+
+  goHome: () => void
+  startGame: () => void
+  toggleLetter: (index: number) => void
+  clearSelection: () => void
+  submitWord: (dict: Set<string>) => void
+  clearFeedback: () => void
 }
 
-export const useGameStore = create<GameState>((set) => ({
+const todaySeed = getTodaySeed()
+
+export const useGameStore = create<GameState>((set, get) => ({
   screen: 'home',
-  setScreen: (screen) => set({ screen }),
+  seed: todaySeed,
+  letters: getDailyLetters(todaySeed),
+  selectedIndices: [],
+  foundWords: [],
+  score: 0,
+  feedback: null,
+
+  goHome: () => set({ screen: 'home' }),
+
+  startGame: () => {
+    const seed = getTodaySeed()
+    set({
+      screen: 'game',
+      seed,
+      letters: getDailyLetters(seed),
+      selectedIndices: [],
+      foundWords: [],
+      score: 0,
+      feedback: null,
+    })
+  },
+
+  toggleLetter: (index) => {
+    const { selectedIndices, letters } = get()
+    if (index < 0 || index >= letters.length) return
+    const at = selectedIndices.indexOf(index)
+    if (at === -1) {
+      set({ selectedIndices: [...selectedIndices, index], feedback: null })
+    } else {
+      // Тап по уже выбранной букве убирает её и все, что после — стандартный UX
+      set({ selectedIndices: selectedIndices.slice(0, at), feedback: null })
+    }
+  },
+
+  clearSelection: () => set({ selectedIndices: [], feedback: null }),
+
+  submitWord: (dict) => {
+    const { selectedIndices, letters, foundWords, score } = get()
+    const word = selectedIndices.map((i) => letters[i]).join('')
+
+    if (word.length < MIN_WORD_LENGTH) {
+      set({ feedback: 'too-short', selectedIndices: [] })
+      return
+    }
+    if (foundWords.includes(word)) {
+      set({ feedback: 'duplicate', selectedIndices: [] })
+      return
+    }
+    if (!dict.has(word)) {
+      set({ feedback: 'invalid', selectedIndices: [] })
+      return
+    }
+    set({
+      foundWords: [...foundWords, word],
+      score: score + calculateScore(word),
+      selectedIndices: [],
+      feedback: 'success',
+    })
+  },
+
+  clearFeedback: () => set({ feedback: null }),
 }))

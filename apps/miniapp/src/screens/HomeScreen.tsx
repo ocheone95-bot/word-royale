@@ -6,11 +6,11 @@ import { useGameStore } from '../store/useGameStore'
 
 export default function HomeScreen() {
   const user = useTelegramUser()
-  const setScreen = useGameStore((s) => s.setScreen)
+  const startGame = useGameStore((s) => s.startGame)
   const greeting = user?.firstName ? `Hello, ${user.firstName}!` : 'Hello!'
 
   const handlePlay = () => {
-    setScreen('game')
+    startGame()
   }
 
   return (
