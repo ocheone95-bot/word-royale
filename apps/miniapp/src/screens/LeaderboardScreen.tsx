@@ -1,11 +1,27 @@
-// Глобальный лидерборд за сегодняшний UTC-день. Топ-100, лучший скор
-// каждого юзера. Текущий игрок (если играл) подсвечен.
+// Лидерборд за сегодняшний UTC-день. Две вкладки:
+//   - Global: топ-100 всех игроков мира (anon-чтение через Supabase Client).
+//   - Friends: только игроки, связанные с текущим юзером в `referrals` в любую
+//     сторону (через Edge Function friends-leaderboard).
+// Текущий юзер подсвечен в обеих вкладках.
 
 import { useEffect, useState } from 'react'
+import { useRawInitData } from '@telegram-apps/sdk-react'
 import { getTodaySeed } from '@word-royale/shared'
-import { fetchDailyLeaderboard, type LeaderboardEntry } from '../lib/api'
+import {
+  fetchDailyLeaderboard,
+  fetchFriendsLeaderboard,
+  type LeaderboardEntry,
+} from '../lib/api'
 import { useGameStore } from '../store/useGameStore'
 import { useTelegramUser } from '../hooks/useTelegramUser'
+import {
+  buildInviteText,
+  buildPlayDeepLink,
+  buildTelegramShareLink,
+} from '../lib/share'
+import { openTelegramLink } from '../lib/telegram'
+
+type Mode = 'global' | 'friends'
 
 type LoadState =
   | { kind: 'loading' }
@@ -15,28 +31,57 @@ type LoadState =
 export default function LeaderboardScreen() {
   const goHome = useGameStore((s) => s.goHome)
   const tgUser = useTelegramUser()
-  const [state, setState] = useState<LoadState>({ kind: 'loading' })
+  const initData = useRawInitData()
+  const [mode, setMode] = useState<Mode>('global')
+  const [globalState, setGlobalState] = useState<LoadState>({ kind: 'loading' })
+  const [friendsState, setFriendsState] = useState<LoadState>({ kind: 'loading' })
 
   const seed = getTodaySeed()
 
   useEffect(() => {
     let cancelled = false
-    setState({ kind: 'loading' })
+    setGlobalState({ kind: 'loading' })
     fetchDailyLeaderboard(seed)
       .then((entries) => {
-        if (!cancelled) setState({ kind: 'loaded', entries })
+        if (!cancelled) setGlobalState({ kind: 'loaded', entries })
       })
       .catch(() => {
-        if (!cancelled) setState({ kind: 'error' })
+        if (!cancelled) setGlobalState({ kind: 'error' })
       })
     return () => {
       cancelled = true
     }
   }, [seed])
 
+  useEffect(() => {
+    if (mode !== 'friends') return
+    if (!initData) return
+    let cancelled = false
+    setFriendsState({ kind: 'loading' })
+    fetchFriendsLeaderboard(initData, seed)
+      .then((res) => {
+        if (cancelled) return
+        if (res.ok) setFriendsState({ kind: 'loaded', entries: res.entries })
+        else setFriendsState({ kind: 'error' })
+      })
+      .catch(() => {
+        if (!cancelled) setFriendsState({ kind: 'error' })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [mode, initData, seed])
+
+  const state = mode === 'global' ? globalState : friendsState
+
+  const handleInvite = () => {
+    const url = buildPlayDeepLink(tgUser?.id ?? null)
+    openTelegramLink(buildTelegramShareLink(buildInviteText(), url))
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex flex-col px-6 py-8 text-white">
-      <header className="flex items-center justify-between mb-6">
+      <header className="flex items-center justify-between mb-4">
         <button
           type="button"
           onClick={goHome}
@@ -44,9 +89,34 @@ export default function LeaderboardScreen() {
         >
           ← Home
         </button>
-        <h1 className="font-semibold">Today's Top 100</h1>
+        <h1 className="font-semibold">Leaderboard</h1>
         <span className="text-xs text-slate-400 font-mono">{seed}</span>
       </header>
+
+      <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-800/60 border border-slate-700 mb-5 text-sm">
+        <button
+          type="button"
+          onClick={() => setMode('global')}
+          className={`py-2 rounded-lg transition ${
+            mode === 'global'
+              ? 'bg-purple-600 text-white'
+              : 'text-slate-300 active:scale-95'
+          }`}
+        >
+          Global
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('friends')}
+          className={`py-2 rounded-lg transition ${
+            mode === 'friends'
+              ? 'bg-purple-600 text-white'
+              : 'text-slate-300 active:scale-95'
+          }`}
+        >
+          Friends
+        </button>
+      </div>
 
       {state.kind === 'loading' && (
         <p className="text-slate-400 text-sm text-center mt-10">Loading…</p>
@@ -59,9 +129,7 @@ export default function LeaderboardScreen() {
       )}
 
       {state.kind === 'loaded' && state.entries.length === 0 && (
-        <p className="text-slate-400 text-sm text-center mt-10">
-          No scores yet today. Be the first.
-        </p>
+        <FriendsEmptyOrGlobalEmpty mode={mode} onInvite={handleInvite} />
       )}
 
       {state.kind === 'loaded' && state.entries.length > 0 && (
@@ -98,5 +166,35 @@ export default function LeaderboardScreen() {
         </ol>
       )}
     </main>
+  )
+}
+
+interface EmptyProps {
+  mode: Mode
+  onInvite: () => void
+}
+
+function FriendsEmptyOrGlobalEmpty({ mode, onInvite }: EmptyProps) {
+  if (mode === 'global') {
+    return (
+      <p className="text-slate-400 text-sm text-center mt-10">
+        No scores yet today. Be the first.
+      </p>
+    )
+  }
+  return (
+    <div className="flex flex-col items-center mt-10 gap-3">
+      <p className="text-slate-400 text-sm text-center">
+        No friends here yet. Invite someone to play and you'll show up in each
+        other's Friends leaderboard.
+      </p>
+      <button
+        type="button"
+        onClick={onInvite}
+        className="py-2 px-4 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-semibold active:scale-95 transition"
+      >
+        📤 Invite friends
+      </button>
+    </div>
   )
 }

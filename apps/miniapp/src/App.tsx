@@ -7,6 +7,7 @@ import GameScreen from './screens/GameScreen'
 import ResultScreen from './screens/ResultScreen'
 import LeaderboardScreen from './screens/LeaderboardScreen'
 import { useGameStore } from './store/useGameStore'
+import { useReferralAttribution } from './hooks/useReferralAttribution'
 
 type State = { hasError: boolean }
 
@@ -44,9 +45,18 @@ function ActiveScreen() {
   return <HomeScreen />
 }
 
+// Отдельный «невидимый» компонент: реф-атрибуция требует Telegram-launch-params,
+// которые могут бросить вне TMA. Держим хук под ErrorBoundary рядом с UI-стволом,
+// и он не привязан к смене экранов (иначе перезапускался бы при каждом ремаунте).
+function ReferralAttributor() {
+  useReferralAttribution()
+  return null
+}
+
 export default function App() {
   return (
     <TelegramErrorBoundary>
+      <ReferralAttributor />
       <ActiveScreen />
     </TelegramErrorBoundary>
   )

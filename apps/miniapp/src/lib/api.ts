@@ -7,6 +7,20 @@ import { supabase } from './supabase'
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
+function functionUrl(name: string): string | null {
+  if (!SUPABASE_URL) return null
+  return `${SUPABASE_URL}/functions/v1/${name}`
+}
+
+function functionHeaders(): Record<string, string> | null {
+  if (!SUPABASE_ANON_KEY) return null
+  return {
+    'Content-Type': 'application/json',
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  }
+}
+
 export interface SubmitSessionPayload {
   initData: string
   dailySeed: string
@@ -36,20 +50,17 @@ export type SubmitSessionResult = SubmitSessionSuccess | SubmitSessionFailure
 export async function submitSession(
   payload: SubmitSessionPayload,
 ): Promise<SubmitSessionResult> {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  const url = functionUrl('submit-score')
+  const headers = functionHeaders()
+  if (!url || !headers) {
     return { ok: false, error: 'env_missing' }
   }
 
-  const url = `${SUPABASE_URL}/functions/v1/submit-score`
   let res: Response
   try {
     res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
+      headers,
       body: JSON.stringify(payload),
     })
   } catch (e) {
@@ -74,6 +85,28 @@ export async function submitSession(
   }
 
   return json as SubmitSessionSuccess
+}
+
+// Реф-атрибуция. Тихая операция: на ошибки не реагируем в UI, лоигрование
+// в консоль помогает в проде через Sentry (когда подключим в Polish-неделе).
+export async function recordReferral(
+  initData: string,
+  startParam: string,
+): Promise<void> {
+  const url = functionUrl('record-referral')
+  const headers = functionHeaders()
+  if (!url || !headers) return
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ initData, startParam }),
+    })
+  } catch (e) {
+    // Не критично — атрибуция повторится при следующем заходе по той же ссылке.
+    console.warn('record-referral failed', e)
+  }
 }
 
 export interface LeaderboardEntry {
@@ -133,5 +166,53 @@ export async function fetchDailyLeaderboard(
   return Array.from(bestByUser.values())
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
+}
+
+interface FriendsLeaderboardSuccess {
+  ok: true
+  entries: LeaderboardEntry[]
+}
+
+interface FriendsLeaderboardFailure {
+  ok: false
+  error: string
+}
+
+export type FriendsLeaderboardResult =
+  | FriendsLeaderboardSuccess
+  | FriendsLeaderboardFailure
+
+export async function fetchFriendsLeaderboard(
+  initData: string,
+  dailySeed: string,
+): Promise<FriendsLeaderboardResult> {
+  const url = functionUrl('friends-leaderboard')
+  const headers = functionHeaders()
+  if (!url || !headers) return { ok: false, error: 'env_missing' }
+
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ initData, dailySeed }),
+    })
+  } catch (e) {
+    return { ok: false, error: 'network' + (e ? `:${String(e)}` : '') }
+  }
+
+  let json: unknown
+  try {
+    json = await res.json()
+  } catch {
+    return { ok: false, error: 'bad_response' }
+  }
+
+  const j = (json ?? {}) as Record<string, unknown>
+  if (!res.ok || j.ok !== true) {
+    return { ok: false, error: (j.error as string) ?? 'http_error' }
+  }
+  const entries = Array.isArray(j.entries) ? (j.entries as LeaderboardEntry[]) : []
+  return { ok: true, entries }
 }
 
