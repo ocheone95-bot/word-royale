@@ -1,6 +1,12 @@
-// Главный экран Mini App: заголовок и кнопка Play. Stub без логики до Недели 2.
+// Главный экран Mini App. Показывает приветствие с именем юзера из Telegram
+// и кнопку Play. Игровая логика подключится на Неделе 2.
+
+import { useTelegramUser } from '../hooks/useTelegramUser'
 
 export default function HomeScreen() {
+  const user = useTelegramUser()
+  const greeting = user?.firstName ? `Hello, ${user.firstName}!` : 'Hello!'
+
   const handlePlay = () => {
     console.log('Play pressed')
   }
@@ -8,6 +14,7 @@ export default function HomeScreen() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex flex-col items-center justify-center px-6 text-white">
       <div className="max-w-md w-full text-center">
+        <p className="text-purple-300 mb-2 text-base">{greeting}</p>
         <h1 className="text-5xl font-bold tracking-tight mb-3 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
           Word Royale
         </h1>
