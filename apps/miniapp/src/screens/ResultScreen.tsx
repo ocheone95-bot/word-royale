@@ -71,9 +71,11 @@ export default function ResultScreen() {
   const needsBuyReplay = knowStatus && replayCredits === 0
   const handleBuyReplay = () => openTelegramLink(buildBuyReplayDeepLink())
 
-  // Share становится активным только после серверного подтверждения. Иначе
-  // юзер мог бы расшарить «не сохранённый» результат и сбить ленту друзьям.
-  const canShare = submitStatus === 'success'
+  // Share становится активным после серверного подтверждения ИЛИ в случае
+  // no_replay — счёт настоящий (юзер реально играл и набрал очки), просто
+  // rate-limit не дал сохранить второй результат за день. Запрещать шарить
+  // в этом случае было бы UX-облом без причины.
+  const canShare = submitStatus === 'success' || submitError === 'no_replay'
   const handleShare = () => {
     if (!canShare) return
     const text = buildShareText({

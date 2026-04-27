@@ -169,7 +169,18 @@ export const useGameStore = create<GameState>((set, get) => ({
         },
       })
     } else {
-      set({ submitStatus: 'error', submitError: result.error })
+      // При no_replay сервер уже знает, что юзер играл сегодня и кредитов нет —
+      // обновляем todayStatus, чтобы Home корректно показал «Buy replay» и не
+      // светил кнопкой Play, ведущей в тот же тупик.
+      if (result.error === 'no_replay') {
+        set({
+          submitStatus: 'error',
+          submitError: result.error,
+          todayStatus: { loaded: true, playedToday: true, replayCredits: 0 },
+        })
+      } else {
+        set({ submitStatus: 'error', submitError: result.error })
+      }
     }
   },
 
