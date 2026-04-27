@@ -280,3 +280,12 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # а он не парсится как Supabase Auth JWT. Проверяем подпись initData
 # внутри функции через HMAC bot_token.
 verify_jwt = false
+
+[functions.record-referral]
+# Та же история, что и у submit-score: аутентификация юзера живёт
+# внутри функции через HMAC initData, gateway-проверка JWT мешает.
+verify_jwt = false
+
+[functions.friends-leaderboard]
+# Та же история, что и у submit-score.
+verify_jwt = false
