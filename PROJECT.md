@@ -356,14 +356,14 @@ create index idx_users_telegram_id on users(telegram_id);
 - [x] Таймер 90 секунд
 - [x] Экран результата
 
-### Неделя 3: Backend и социалка
+### Неделя 3: Backend и социалка ✅
 - [x] Supabase setup, миграции
 - [x] Сохранение игровых сессий
 - [x] Edge Function для валидации скора
 - [x] Глобальный лидерборд топ-100
-- [ ] Friends лидерборд (рефералка как «друзья» — перенесли в Неделю 5)
-- [ ] Кнопка Share с генерацией картинки результата (перенесли в Неделю 5)
-- [ ] Реферальная ссылка с трекингом (перенесли в Неделю 5)
+- [x] Friends лидерборд (через реферальную сеть, без требования взаимности в MVP)
+- [x] Кнопка Share с Wordle-style эмодзи-визуалом + reф-ссылка в превью
+- [x] Реферальная ссылка с трекингом (`startapp=ref_<id>` → Mini App + record-referral)
 
 ### Неделя 4: Монетизация
 - [ ] Telegram Stars интеграция в бот
@@ -487,6 +487,7 @@ PM должен подготовить:
 | 2026-04-27 | Закрыта Неделя 1: деплой на Vercel, привязка Mini App в @BotFather, интеграция `@telegram-apps/sdk-react`, ErrorBoundary-fallback. Стек обновлён на фактический (React 19, Vite 8, Tailwind v4, Node 22+). |
 | 2026-04-27 | Закрыта Неделя 2: словарь SCOWL в `packages/dictionary` (~26k слов после фильтра 3-7 букв, lazy chunk), алгоритм daily-seed в `packages/shared` (7 уникальных букв, ≥3 гласных, ~52 слова в среднем на набор), полный gameplay loop (выбор букв → валидация → счёт → таймер 90с → результат) на Zustand. Свайп пропущен сознательно — добавим после фидбека беты. Rate-limit «1 игра в день» придёт вместе со Stars на Неделе 4. |
 | 2026-04-27 | Сессия 4. Backend Недели 3 сделан на 4/7 пунктов: Supabase БД (7 таблиц + RLS) через миграцию `0001_init.sql`, словарь залит в `dictionary_words` (25 912 слов), Edge Function `submit-score` с серверной re-валидацией (HMAC initData → seed → letters → каждое слово → score), глобальный топ-100 на сегодня в новом `LeaderboardScreen`. Социалка (Friends-лидерборд через рефералку, Share, реферальная ссылка) перенесена в Polish-неделю 5. Игровая логика дублирована в `supabase/functions/_shared/game.ts` из-за Deno bundler — это технический долг, закрыть snapshot-тестом. Edge Function задеплоена с `verify_jwt = false`, потому что новые `sb_publishable_*` ключи Supabase не парсятся gateway'ем как JWT; auth юзера живёт внутри функции через initData. |
+| 2026-04-27 | Сессия 5. Закрыли хвост Недели 3: (1) Wordle-style Share-кнопка на ResultScreen — текст со скором и реф-ссылка `t.me/word_royale_bot/play?startapp=ref_<id>` через `t.me/share/url` и `WebApp.openTelegramLink`. (2) Реф-атрибуция: хук `useReferralAttribution` парсит `start_param` из raw initData, шлёт в Edge Function `record-referral` (PK на (referrer_id, referred_id) + self-referral guard + проверка что referrer уже существует). (3) Friends-tab на лидерборде через Edge Function `friends-leaderboard` (initData-auth, симметрично `submit-score`); friend = любая стрелка в `referrals`, без требования взаимности в MVP. (4) Snapshot-тест эквивалентности `@word-royale/shared` ↔ `_shared/game.ts` через Vitest (35 тестов, `npm test`). (5) Окно `auth_date` в `verify-init-data` снижено с 24 ч до 1 ч. Бот для команды `/start` не понадобился — `startapp=` открывает Mini App напрямую, реворк ботов отложен на отдельную сессию вместе со Stars. |
 
 ---
 
