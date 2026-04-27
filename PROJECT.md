@@ -366,12 +366,14 @@ create index idx_users_telegram_id on users(telegram_id);
 - [x] Реферальная ссылка с трекингом (`startapp=ref_<id>` → Mini App + record-referral)
 
 ### Неделя 4: Монетизация
-- [ ] Telegram Stars интеграция в бот
-- [ ] Webhook на successful_payment
+- [x] Telegram Stars интеграция в бот (apps/bot, grammY, Vercel webhook)
+- [x] Webhook на successful_payment (атомарный grant_replay_credit RPC)
 - [ ] Подписка Word Pro (логика проверки активной подписки)
-- [ ] Микро-IAP: replay, темы, double score
+- [x] Rate-limit «1 игра в день» + первый IAP replay (50 ⭐) — submit-score enforce
+- [ ] Микро-IAP: темы (100 ⭐), double score (200 ⭐)
 - [ ] Monetag SDK для rewarded ads
-- [ ] UI магазина внутри Mini App
+- [x] Buy replay UI на HomeScreen / ResultScreen (deep-link `?start=buy_replay`)
+- [ ] Полноценный Shop-экран в Mini App (когда появятся темы и double score)
 
 ### Неделя 5: Polish
 - [ ] PostHog аналитика — все ключевые события
@@ -488,6 +490,7 @@ PM должен подготовить:
 | 2026-04-27 | Закрыта Неделя 2: словарь SCOWL в `packages/dictionary` (~26k слов после фильтра 3-7 букв, lazy chunk), алгоритм daily-seed в `packages/shared` (7 уникальных букв, ≥3 гласных, ~52 слова в среднем на набор), полный gameplay loop (выбор букв → валидация → счёт → таймер 90с → результат) на Zustand. Свайп пропущен сознательно — добавим после фидбека беты. Rate-limit «1 игра в день» придёт вместе со Stars на Неделе 4. |
 | 2026-04-27 | Сессия 4. Backend Недели 3 сделан на 4/7 пунктов: Supabase БД (7 таблиц + RLS) через миграцию `0001_init.sql`, словарь залит в `dictionary_words` (25 912 слов), Edge Function `submit-score` с серверной re-валидацией (HMAC initData → seed → letters → каждое слово → score), глобальный топ-100 на сегодня в новом `LeaderboardScreen`. Социалка (Friends-лидерборд через рефералку, Share, реферальная ссылка) перенесена в Polish-неделю 5. Игровая логика дублирована в `supabase/functions/_shared/game.ts` из-за Deno bundler — это технический долг, закрыть snapshot-тестом. Edge Function задеплоена с `verify_jwt = false`, потому что новые `sb_publishable_*` ключи Supabase не парсятся gateway'ем как JWT; auth юзера живёт внутри функции через initData. |
 | 2026-04-27 | Сессия 5. Закрыли хвост Недели 3: (1) Wordle-style Share-кнопка на ResultScreen — текст со скором и реф-ссылка `t.me/word_royale_bot/play?startapp=ref_<id>` через `t.me/share/url` и `WebApp.openTelegramLink`. (2) Реф-атрибуция: хук `useReferralAttribution` парсит `start_param` из raw initData, шлёт в Edge Function `record-referral` (PK на (referrer_id, referred_id) + self-referral guard + проверка что referrer уже существует). (3) Friends-tab на лидерборде через Edge Function `friends-leaderboard` (initData-auth, симметрично `submit-score`); friend = любая стрелка в `referrals`, без требования взаимности в MVP. (4) Snapshot-тест эквивалентности `@word-royale/shared` ↔ `_shared/game.ts` через Vitest (35 тестов, `npm test`). (5) Окно `auth_date` в `verify-init-data` снижено с 24 ч до 1 ч. Бот для команды `/start` не понадобился — `startapp=` открывает Mini App напрямую, реворк ботов отложен на отдельную сессию вместе со Stars. |
+| 2026-04-27 | Сессия 6. Открыли Неделю 4 первым полным Stars-флоу. (1) `apps/bot` — отдельный Vercel-проект на grammY, webhook через `webhookCallback(bot, 'http')` с `secretToken`, базовый `/start` с кнопкой Mini App и обработка deep-link `?start=buy_replay` (сразу invoice, минуя приветствие). (2) Stars-pipeline: `/buy_replay` шлёт `sendInvoice` (provider_token='', currency XTR, 50 ⭐), `pre_checkout_query` валидирует payload/цену/совпадение `from.id`, `successful_payment` зовёт Postgres-функцию `grant_replay_credit` (миграция 0003) — атомарно делает upsert юзера, idempotent insert в `purchases` по `telegram_payment_charge_id`, +1 к `users.replay_credits`. (3) Миграция 0002 — `users.replay_credits` (счётчик, check ≥ 0) + `game_sessions.was_replay`. Миграция 0004 — `insert_game_session` RPC: атомарный rate-limit «1 игра в день» с расходом replay-токена. `submit-score` теперь возвращает `wasReplay`/`replayCreditsLeft` и 403 `no_replay`, если кредитов нет. (4) Edge Function `today-status` (initData-auth) для UI: `playedToday` + `replayCredits`. (5) Mini App: HomeScreen свапает primary-кнопку на «Buy replay · 50 ⭐» когда юзер играл и нет кредитов, ResultScreen — аналогично; статус подгружается на маунте и при `visibilitychange` (после возврата из чата с ботом после оплаты). Подписка Word Pro, темы (100 ⭐), double score (200 ⭐), Shop-экран и Monetag — следующая сессия. |
 
 ---
 
