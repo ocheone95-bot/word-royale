@@ -6,6 +6,7 @@ dist/
 build/
 .vite/
 .turbo/
+.vercel/
 
 # Environment files (never commit secrets)
 .env
