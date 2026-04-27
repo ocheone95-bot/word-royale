@@ -1,8 +1,31 @@
-// Экран итогов партии. Показывает финальный счёт, найденные слова и кнопки
-// Play again / Home. Rate-limit (1 игра в день в free tier) подключим на
-// Неделе 4 вместе со Stars-логикой повторов.
+// Экран итогов партии. Показывает финальный счёт, найденные слова, статус
+// серверной отправки и кнопки Play again / Home. После маунта сразу шлёт
+// сессию в submit-score; если что-то пошло не так — показывает причину
+// и кнопку Retry. Rate-limit «1 игра в день» подключим на Неделе 4.
 
+import { useEffect } from 'react'
+import { useRawInitData } from '@telegram-apps/sdk-react'
 import { useGameStore } from '../store/useGameStore'
+
+const ERROR_MESSAGES: Record<string, string> = {
+  env_missing: 'App is not configured.',
+  network: 'Network problem. Tap retry.',
+  invalid_init_data: 'Telegram session invalid. Reopen the bot.',
+  server_misconfigured: 'Server not ready. Try again in a minute.',
+  seed_mismatch: 'A new day has started — play again.',
+  letters_mismatch: 'Letters mismatch. Play again.',
+  score_mismatch: 'Score mismatch.',
+  duplicate_word: 'Duplicate word in submission.',
+  word_not_composable: 'Word does not match the letters.',
+  word_length: 'Word length out of range.',
+  words_not_in_dictionary: 'A word is not in the dictionary.',
+  bad_response: 'Server returned an unexpected response.',
+}
+
+function describeError(code: string | null): string {
+  if (!code) return 'Could not save result.'
+  return ERROR_MESSAGES[code] ?? `Could not save result (${code}).`
+}
 
 export default function ResultScreen() {
   const score = useGameStore((s) => s.score)
@@ -10,10 +33,19 @@ export default function ResultScreen() {
   const seed = useGameStore((s) => s.seed)
   const startGame = useGameStore((s) => s.startGame)
   const goHome = useGameStore((s) => s.goHome)
+  const submitStatus = useGameStore((s) => s.submitStatus)
+  const submitError = useGameStore((s) => s.submitError)
+  const submitCurrentSession = useGameStore((s) => s.submitCurrentSession)
+
+  const initData = useRawInitData()
+
+  useEffect(() => {
+    if (initData && submitStatus === 'idle') {
+      void submitCurrentSession(initData)
+    }
+  }, [initData, submitStatus, submitCurrentSession])
 
   const longest = foundWords.reduce((a, b) => (b.length > a.length ? b : a), '')
-
-  // Сортируем по длине убывающе для красивого вывода
   const sorted = [...foundWords].sort((a, b) => b.length - a.length || a.localeCompare(b))
 
   return (
@@ -35,10 +67,17 @@ export default function ResultScreen() {
         <h1 className="text-7xl font-bold tracking-tight mb-1 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent tabular-nums">
           {score}
         </h1>
-        <p className="text-slate-400 text-sm mb-10">
+        <p className="text-slate-400 text-sm mb-6">
           {foundWords.length} word{foundWords.length === 1 ? '' : 's'}
           {longest ? ` · longest: ${longest.toUpperCase()}` : ''}
         </p>
+
+        <SubmitStatusBlock
+          status={submitStatus}
+          error={submitError}
+          hasInitData={Boolean(initData)}
+          onRetry={() => initData && void submitCurrentSession(initData)}
+        />
 
         {sorted.length > 0 ? (
           <div className="w-full max-w-sm mb-10">
@@ -75,5 +114,43 @@ export default function ResultScreen() {
         </div>
       </div>
     </main>
+  )
+}
+
+interface SubmitStatusBlockProps {
+  status: 'idle' | 'submitting' | 'success' | 'error'
+  error: string | null
+  hasInitData: boolean
+  onRetry: () => void
+}
+
+function SubmitStatusBlock({ status, error, hasInitData, onRetry }: SubmitStatusBlockProps) {
+  if (!hasInitData) {
+    return (
+      <p className="mb-8 text-xs text-slate-500">
+        Open in Telegram to save your score to the leaderboard.
+      </p>
+    )
+  }
+
+  if (status === 'submitting' || status === 'idle') {
+    return <p className="mb-8 text-xs text-slate-400">Saving to leaderboard…</p>
+  }
+
+  if (status === 'success') {
+    return <p className="mb-8 text-xs text-emerald-400">Saved to leaderboard ✓</p>
+  }
+
+  return (
+    <div className="mb-8 flex flex-col items-center gap-2">
+      <p className="text-xs text-rose-400">{describeError(error)}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="text-xs text-purple-300 underline active:scale-95 transition"
+      >
+        Retry
+      </button>
+    </div>
   )
 }

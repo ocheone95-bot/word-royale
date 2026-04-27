@@ -1,5 +1,5 @@
-// Глобальный стейт игры — навигация, текущая партия, выбор букв, результат.
-// Таймер подключится отдельным шагом.
+// Глобальный стейт игры — навигация, текущая партия, выбор букв, результат,
+// статус серверной отправки сессии.
 
 import { create } from 'zustand'
 import {
@@ -10,9 +10,11 @@ import {
   type DailySeed,
   type Letters,
 } from '@word-royale/shared'
+import { submitSession } from '../lib/api'
 
 export type Screen = 'home' | 'game' | 'result'
 export type Feedback = null | 'success' | 'invalid' | 'duplicate' | 'too-short'
+export type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error'
 
 export const GAME_DURATION_SECONDS = 90
 
@@ -28,6 +30,11 @@ interface GameState {
   feedback: Feedback
   timeLeft: number
 
+  // серверная отправка результата
+  submitStatus: SubmitStatus
+  submitError: string | null
+  serverScore: number | null
+
   goHome: () => void
   startGame: () => void
   toggleLetter: (index: number) => void
@@ -35,6 +42,7 @@ interface GameState {
   submitWord: (dict: Set<string>) => void
   clearFeedback: () => void
   tickTimer: () => void
+  submitCurrentSession: (initData: string) => Promise<void>
 }
 
 const todaySeed = getTodaySeed()
@@ -49,6 +57,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   feedback: null,
   timeLeft: GAME_DURATION_SECONDS,
 
+  submitStatus: 'idle',
+  submitError: null,
+  serverScore: null,
+
   goHome: () => set({ screen: 'home' }),
 
   startGame: () => {
@@ -62,6 +74,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       score: 0,
       feedback: null,
       timeLeft: GAME_DURATION_SECONDS,
+      submitStatus: 'idle',
+      submitError: null,
+      serverScore: null,
     })
   },
 
@@ -113,6 +128,25 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ timeLeft: 0, screen: 'result', selectedIndices: [], feedback: null })
     } else {
       set({ timeLeft: next })
+    }
+  },
+
+  submitCurrentSession: async (initData) => {
+    const { seed, letters, foundWords, score, submitStatus } = get()
+    if (submitStatus === 'submitting' || submitStatus === 'success') return
+    set({ submitStatus: 'submitting', submitError: null })
+    const result = await submitSession({
+      initData,
+      dailySeed: seed,
+      letters: [...letters],
+      wordsFound: foundWords,
+      score,
+      durationSec: GAME_DURATION_SECONDS,
+    })
+    if (result.ok) {
+      set({ submitStatus: 'success', serverScore: result.score, submitError: null })
+    } else {
+      set({ submitStatus: 'error', submitError: result.error })
     }
   },
 }))
