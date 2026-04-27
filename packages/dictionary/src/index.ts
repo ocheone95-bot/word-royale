@@ -10,7 +10,10 @@ export async function loadDictionary(): Promise<Set<string>> {
   if (pendingLoad) return pendingLoad;
 
   pendingLoad = (async () => {
-    const mod = await import('../data/english.json', { with: { type: 'json' } });
+    // Без import attributes (`with { type: 'json' }`) — они мешают Vite
+    // переписать путь на сгенерированный chunk и в production вызывают
+    // «Importing a module script failed». Vite понимает .json по расширению.
+    const mod = await import('../data/english.json');
     // JSON-модули по дефолту экспортируют через `default`
     const words = (mod.default ?? mod) as readonly string[];
     cachedSet = new Set(words);
