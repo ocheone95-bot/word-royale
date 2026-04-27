@@ -4,12 +4,14 @@
 import { Bot } from 'grammy';
 import { registerStartHandler } from './handlers/start.js';
 import { registerBuyHandlers } from './handlers/buy.js';
+import { registerPaymentHandlers } from './handlers/payment.js';
 
 export function createBot(token: string): Bot {
   const bot = new Bot(token);
 
   registerStartHandler(bot);
   registerBuyHandlers(bot);
+  registerPaymentHandlers(bot);
 
   return bot;
 }
