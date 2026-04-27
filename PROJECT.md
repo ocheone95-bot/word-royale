@@ -62,10 +62,10 @@
 ## 🛠️ Технологический стек
 
 ### Frontend (Mini App)
-- **Framework:** React 18 + TypeScript
-- **Build:** Vite
-- **Стилизация:** Tailwind CSS
-- **Telegram интеграция:** `@telegram-apps/sdk-react`
+- **Framework:** React 19 + TypeScript (Node 22+)
+- **Build:** Vite 8
+- **Стилизация:** Tailwind CSS v4 (через `@tailwindcss/vite` plugin)
+- **Telegram интеграция:** `@telegram-apps/sdk-react` v3.x
 - **State:** Zustand (простой, не Redux)
 - **Хостинг:** Vercel (бесплатный тир)
 
@@ -73,7 +73,7 @@
 - **БД + Auth + Realtime:** Supabase (бесплатно до 50k MAU)
 - **Edge Functions:** Supabase Edge Functions для проверки платежей и серверной логики
 - **Telegram Bot:** Node.js + `grammY` библиотека
-- **Хостинг бота:** Vercel Serverless Functions или Railway (бесплатный тир)
+- **Хостинг бота:** Vercel Serverless Functions (бесплатный тир)
 
 ### Внешние сервисы
 - **Платежи:** Telegram Stars (нативно через Bot API)
@@ -335,14 +335,16 @@ create index idx_users_telegram_id on users(telegram_id);
 
 ## 🚀 Roadmap MVP (6 недель)
 
-### Неделя 1: Фундамент
+### Неделя 1: Фундамент ✅
 - [x] Setup репозитория, monorepo через npm workspaces
 - [x] Создание React + Vite + TypeScript проекта
-- [x] Регистрация бота через @BotFather
-- [ ] Hello World в Telegram (Mini App открывается из бота)
-- [ ] Telegram SDK интеграция, получение initData юзера
+- [x] Регистрация бота через @BotFather (`@word_royale_bot`)
+- [x] Hello World в Telegram (Mini App открывается из бота)
+- [x] Telegram SDK интеграция, получение initData юзера
 - [x] Базовый UI: главный экран с кнопкой Play
-- [ ] Loading и error states
+- [x] Loading и error states
+
+> Production URL: https://word-royale-miniapp.vercel.app/ (Vercel project: `word-royale-miniapp`)
 
 ### Неделя 2: Core механика
 - [ ] Загрузка английского словаря (370k слов в JSON)
@@ -482,6 +484,7 @@ PM должен подготовить:
 | Дата | Что изменилось |
 |---|---|
 | 2026-04-26 | Создан первоначальный документ |
+| 2026-04-27 | Закрыта Неделя 1: деплой на Vercel, привязка Mini App в @BotFather, интеграция `@telegram-apps/sdk-react`, ErrorBoundary-fallback. Стек обновлён на фактический (React 19, Vite 8, Tailwind v4, Node 22+). |
 
 ---
 
