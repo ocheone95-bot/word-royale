@@ -35,6 +35,8 @@ export interface SubmitSessionSuccess {
   score: number
   wordsCount: number
   seed: string
+  wasReplay: boolean
+  replayCreditsLeft: number
 }
 
 export interface SubmitSessionFailure {
@@ -85,6 +87,60 @@ export async function submitSession(
   }
 
   return json as SubmitSessionSuccess
+}
+
+export interface TodayStatus {
+  playedToday: boolean
+  replayCredits: number
+  freeGameAvailable: boolean
+}
+
+interface TodayStatusSuccess extends TodayStatus {
+  ok: true
+}
+interface TodayStatusFailure {
+  ok: false
+  error: string
+}
+
+export type TodayStatusResult = TodayStatusSuccess | TodayStatusFailure
+
+export async function fetchTodayStatus(
+  initData: string,
+  dailySeed: string,
+): Promise<TodayStatusResult> {
+  const url = functionUrl('today-status')
+  const headers = functionHeaders()
+  if (!url || !headers) return { ok: false, error: 'env_missing' }
+
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ initData, dailySeed }),
+    })
+  } catch (e) {
+    return { ok: false, error: 'network' + (e ? `:${String(e)}` : '') }
+  }
+
+  let json: unknown
+  try {
+    json = await res.json()
+  } catch {
+    return { ok: false, error: 'bad_response' }
+  }
+
+  const j = (json ?? {}) as Record<string, unknown>
+  if (!res.ok || j.ok !== true) {
+    return { ok: false, error: (j.error as string) ?? 'http_error' }
+  }
+  return {
+    ok: true,
+    playedToday: Boolean(j.playedToday),
+    replayCredits: Number(j.replayCredits ?? 0),
+    freeGameAvailable: Boolean(j.freeGameAvailable),
+  }
 }
 
 // Реф-атрибуция. Тихая операция: на ошибки не реагируем в UI, лоигрование

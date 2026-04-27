@@ -34,6 +34,12 @@ export function buildPlayDeepLink(referrerTelegramId: number | null): string {
   return `${base}?startapp=ref_${referrerTelegramId}`
 }
 
+// Deep-link на бот, который при /start payload=buy_replay сразу шлёт Stars-инвойс
+// на 50 ⭐ за повторную игру (бот-handler в apps/bot/src/handlers/start.ts).
+export function buildBuyReplayDeepLink(): string {
+  return `https://t.me/${BOT_USERNAME}?start=buy_replay`
+}
+
 export function buildTelegramShareLink(text: string, url: string): string {
   const params = new URLSearchParams({ url, text })
   return `https://t.me/share/url?${params.toString()}`

@@ -10,11 +10,14 @@ import {
   type DailySeed,
   type Letters,
 } from '@word-royale/shared'
-import { submitSession } from '../lib/api'
+import { fetchTodayStatus, submitSession } from '../lib/api'
 
 export type Screen = 'home' | 'game' | 'result' | 'leaderboard'
 export type Feedback = null | 'success' | 'invalid' | 'duplicate' | 'too-short'
 export type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error'
+export type TodayStatusState =
+  | { loaded: false }
+  | { loaded: true; playedToday: boolean; replayCredits: number }
 
 export const GAME_DURATION_SECONDS = 90
 
@@ -35,6 +38,9 @@ interface GameState {
   submitError: string | null
   serverScore: number | null
 
+  // статус юзера на сегодня — играл ли уже и сколько replay-токенов
+  todayStatus: TodayStatusState
+
   goHome: () => void
   showLeaderboard: () => void
   startGame: () => void
@@ -44,6 +50,7 @@ interface GameState {
   clearFeedback: () => void
   tickTimer: () => void
   submitCurrentSession: (initData: string) => Promise<void>
+  refreshTodayStatus: (initData: string) => Promise<void>
 }
 
 const todaySeed = getTodaySeed()
@@ -61,6 +68,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   submitStatus: 'idle',
   submitError: null,
   serverScore: null,
+
+  todayStatus: { loaded: false },
 
   goHome: () => set({ screen: 'home' }),
 
@@ -147,9 +156,38 @@ export const useGameStore = create<GameState>((set, get) => ({
       durationSec: GAME_DURATION_SECONDS,
     })
     if (result.ok) {
-      set({ submitStatus: 'success', serverScore: result.score, submitError: null })
+      set({
+        submitStatus: 'success',
+        serverScore: result.score,
+        submitError: null,
+        // На сегодня юзер уже точно играл; кредиты могли уменьшиться
+        // (если это была replay-сессия).
+        todayStatus: {
+          loaded: true,
+          playedToday: true,
+          replayCredits: result.replayCreditsLeft,
+        },
+      })
     } else {
       set({ submitStatus: 'error', submitError: result.error })
     }
+  },
+
+  refreshTodayStatus: async (initData) => {
+    const { seed } = get()
+    const result = await fetchTodayStatus(initData, seed)
+    if (!result.ok) {
+      // Молчаливо: статус — это UX-подсказка, ошибка не должна ломать экран.
+      // В худшем случае юзер попробует Play и получит no_replay из submit-score.
+      console.warn('today-status failed', result.error)
+      return
+    }
+    set({
+      todayStatus: {
+        loaded: true,
+        playedToday: result.playedToday,
+        replayCredits: result.replayCredits,
+      },
+    })
   },
 }))

@@ -289,3 +289,7 @@ verify_jwt = false
 [functions.friends-leaderboard]
 # Та же история, что и у submit-score.
 verify_jwt = false
+
+[functions.today-status]
+# Та же история, что и у submit-score.
+verify_jwt = false

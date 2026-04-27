@@ -8,11 +8,14 @@ import { useRawInitData } from '@telegram-apps/sdk-react'
 import { useGameStore } from '../store/useGameStore'
 import { useTelegramUser } from '../hooks/useTelegramUser'
 import {
+  buildBuyReplayDeepLink,
   buildPlayDeepLink,
   buildShareText,
   buildTelegramShareLink,
 } from '../lib/share'
 import { openTelegramLink } from '../lib/telegram'
+
+const REPLAY_PRICE_STARS = 50
 
 const ERROR_MESSAGES: Record<string, string> = {
   env_missing: 'App is not configured.',
@@ -27,6 +30,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   word_length: 'Word length out of range.',
   words_not_in_dictionary: 'A word is not in the dictionary.',
   bad_response: 'Server returned an unexpected response.',
+  no_replay: 'Already played today. Buy a replay to save another result.',
 }
 
 function describeError(code: string | null): string {
@@ -44,6 +48,7 @@ export default function ResultScreen() {
   const submitStatus = useGameStore((s) => s.submitStatus)
   const submitError = useGameStore((s) => s.submitError)
   const submitCurrentSession = useGameStore((s) => s.submitCurrentSession)
+  const todayStatus = useGameStore((s) => s.todayStatus)
 
   const initData = useRawInitData()
   const tgUser = useTelegramUser()
@@ -56,6 +61,15 @@ export default function ResultScreen() {
 
   const longest = foundWords.reduce((a, b) => (b.length > a.length ? b : a), '')
   const sorted = [...foundWords].sort((a, b) => b.length - a.length || a.localeCompare(b))
+
+  // После сохранения сессии: если кредитов больше нет, «Play again» меняется
+  // на «Buy replay» (deep-link в бот). До сохранения и без статуса — оставляем
+  // обычный Play again, пользовательский тап вызовет startGame и потом, при
+  // submit'е, либо спишется кредит, либо вернётся ошибка no_replay.
+  const knowStatus = todayStatus.loaded
+  const replayCredits = knowStatus ? todayStatus.replayCredits : null
+  const needsBuyReplay = knowStatus && replayCredits === 0
+  const handleBuyReplay = () => openTelegramLink(buildBuyReplayDeepLink())
 
   // Share становится активным только после серверного подтверждения. Иначе
   // юзер мог бы расшарить «не сохранённый» результат и сбить ленту друзьям.
@@ -138,13 +152,25 @@ export default function ResultScreen() {
             >
               Home
             </button>
-            <button
-              type="button"
-              onClick={startGame}
-              className="py-3 rounded-xl bg-purple-600 text-white font-semibold active:scale-95 transition"
-            >
-              Play again
-            </button>
+            {needsBuyReplay ? (
+              <button
+                type="button"
+                onClick={handleBuyReplay}
+                className="py-3 rounded-xl bg-amber-500 text-white font-semibold active:scale-95 transition"
+              >
+                Buy replay · {REPLAY_PRICE_STARS} ⭐
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startGame}
+                className="py-3 rounded-xl bg-purple-600 text-white font-semibold active:scale-95 transition"
+              >
+                {replayCredits !== null && replayCredits > 0
+                  ? `Play replay (${replayCredits})`
+                  : 'Play again'}
+              </button>
+            )}
           </div>
         </div>
       </div>

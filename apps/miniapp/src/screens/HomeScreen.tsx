@@ -1,26 +1,67 @@
 // Главный экран Mini App. Показывает приветствие с именем юзера из Telegram,
-// кнопки Play, Leaderboard и Invite friends (откроет нативный Telegram-share
-// со ссылкой `t.me/word_royale_bot/play?startapp=ref_<userId>`).
+// кнопки Play / Buy replay, Leaderboard и Invite friends.
+//
+// Логика главной кнопки:
+//   - не играл сегодня → «Play» (бесплатная игра)
+//   - играл и есть replay-кредит → «Play replay (N left)»
+//   - играл и кредитов 0 → primary кнопка «Buy replay (50 ⭐)», deep-link в бот.
 
+import { useEffect } from 'react'
+import { useRawInitData } from '@telegram-apps/sdk-react'
 import { useTelegramUser } from '../hooks/useTelegramUser'
 import { useGameStore } from '../store/useGameStore'
 import {
+  buildBuyReplayDeepLink,
   buildInviteText,
   buildPlayDeepLink,
   buildTelegramShareLink,
 } from '../lib/share'
 import { openTelegramLink } from '../lib/telegram'
 
+const REPLAY_PRICE_STARS = 50
+
 export default function HomeScreen() {
   const user = useTelegramUser()
+  const initData = useRawInitData()
   const startGame = useGameStore((s) => s.startGame)
   const showLeaderboard = useGameStore((s) => s.showLeaderboard)
+  const todayStatus = useGameStore((s) => s.todayStatus)
+  const refreshTodayStatus = useGameStore((s) => s.refreshTodayStatus)
   const greeting = user?.firstName ? `Hello, ${user.firstName}!` : 'Hello!'
+
+  // Подгрузка статуса при первом маунте Home и при возврате во вкладку
+  // (после оплаты Stars в боте Mini App снова получает focus).
+  useEffect(() => {
+    if (!initData) return
+    void refreshTodayStatus(initData)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshTodayStatus(initData)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [initData, refreshTodayStatus])
 
   const handleInvite = () => {
     const url = buildPlayDeepLink(user?.id ?? null)
     openTelegramLink(buildTelegramShareLink(buildInviteText(), url))
   }
+
+  const handleBuyReplay = () => {
+    openTelegramLink(buildBuyReplayDeepLink())
+  }
+
+  // По умолчанию (статус ещё не загружен) — показываем Play, чтобы не блокировать
+  // первый клик. Если submit-score вернёт no_replay, ResultScreen покажет ошибку.
+  const playedToday = todayStatus.loaded ? todayStatus.playedToday : false
+  const replayCredits = todayStatus.loaded ? todayStatus.replayCredits : 0
+  const noFreeNoCredits = playedToday && replayCredits === 0
+  const playLabel = !playedToday
+    ? 'Play'
+    : replayCredits > 0
+      ? `Play replay (${replayCredits} left)`
+      : 'Play'
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex flex-col items-center justify-center px-6 text-white">
@@ -32,13 +73,31 @@ export default function HomeScreen() {
         <p className="text-slate-300 mb-12 text-lg">
           Daily 90-second word puzzle. Same letters for everyone.
         </p>
-        <button
-          type="button"
-          onClick={startGame}
-          className="w-full bg-purple-600 hover:bg-purple-500 active:scale-95 transition py-4 rounded-2xl text-xl font-semibold shadow-lg shadow-purple-900/50 mb-3"
-        >
-          Play
-        </button>
+        {noFreeNoCredits ? (
+          <button
+            type="button"
+            onClick={handleBuyReplay}
+            className="w-full bg-amber-500 hover:bg-amber-400 active:scale-95 transition py-4 rounded-2xl text-xl font-semibold shadow-lg shadow-amber-900/50 mb-3"
+          >
+            Buy replay · {REPLAY_PRICE_STARS} ⭐
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={startGame}
+            className="w-full bg-purple-600 hover:bg-purple-500 active:scale-95 transition py-4 rounded-2xl text-xl font-semibold shadow-lg shadow-purple-900/50 mb-3"
+          >
+            {playLabel}
+          </button>
+        )}
+        {playedToday && (
+          <p className="text-xs text-slate-400 mb-3">
+            You already played today.{' '}
+            {replayCredits > 0
+              ? `${replayCredits} replay${replayCredits === 1 ? '' : 's'} ready.`
+              : 'Buy a replay to play again.'}
+          </p>
+        )}
         <button
           type="button"
           onClick={showLeaderboard}

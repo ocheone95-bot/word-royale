@@ -2,7 +2,7 @@
 // payload содержит productId и telegramUserId — Telegram возвращает его
 // в pre_checkout_query и successful_payment, по нему мы понимаем кто и что купил.
 
-import type { Bot } from 'grammy';
+import type { Bot, Context } from 'grammy';
 import { PRODUCTS, isProductId, type ProductId } from '../products.js';
 
 // Формат: <productId>:<telegramUserId>:<nonce>
@@ -30,25 +30,29 @@ export function parseInvoicePayload(payload: string): ParsedPayload | null {
   return { productId: productIdRaw, telegramUserId };
 }
 
+// Шлёт invoice для replay-продукта в текущий чат. Используется и из команды
+// /buy_replay, и из /start buy_replay (deep-link из Mini App).
+export async function sendReplayInvoice(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+  const chatId = ctx.chat?.id;
+  if (!userId || !chatId) {
+    await ctx.reply('Could not identify you. Open the bot from your Telegram app.');
+    return;
+  }
+
+  const product = PRODUCTS.replay;
+
+  await ctx.replyWithInvoice(
+    product.title,
+    product.description,
+    buildInvoicePayload(product.id, userId),
+    'XTR',
+    [{ label: product.title, amount: product.starsAmount }],
+    // provider_token для Stars должен быть пустой строкой
+    { provider_token: '' },
+  );
+}
+
 export function registerBuyHandlers(bot: Bot): void {
-  bot.command('buy_replay', async (ctx) => {
-    const userId = ctx.from?.id;
-    const chatId = ctx.chat?.id;
-    if (!userId || !chatId) {
-      await ctx.reply('Could not identify you. Open the bot from your Telegram app.');
-      return;
-    }
-
-    const product = PRODUCTS.replay;
-
-    await ctx.replyWithInvoice(
-      product.title,
-      product.description,
-      buildInvoicePayload(product.id, userId),
-      'XTR',
-      [{ label: product.title, amount: product.starsAmount }],
-      // provider_token для Stars должен быть пустой строкой
-      { provider_token: '' },
-    );
-  });
+  bot.command('buy_replay', sendReplayInvoice);
 }

@@ -1,10 +1,12 @@
-// Обработчик команды /start. Приветствует юзера и даёт кнопку Mini App.
+// Обработчик команды /start. Без payload — приветствует юзера и даёт кнопку
+// Mini App. С payload `buy_replay` (deep-link из Mini App «Buy replay») —
+// сразу шлёт Stars-инвойс, минуя приветствие.
+//
 // Реф-атрибуция через `?start=ref_<id>` сейчас не нужна — реф-ссылки используют
-// `startapp=ref_<id>` и открывают Mini App напрямую, минуя бота. Если в будущем
-// решим поддерживать классические `t.me/<bot>?start=ref_<id>`, парсить параметр
-// надо здесь из `ctx.match`.
+// `startapp=ref_<id>` и открывают Mini App напрямую, минуя бота.
 
 import type { Bot } from 'grammy';
+import { sendReplayInvoice } from './buy.js';
 
 const MINI_APP_URL = process.env.MINI_APP_URL ?? 'https://word-royale-miniapp.vercel.app/';
 
@@ -19,6 +21,12 @@ const WELCOME = [
 
 export function registerStartHandler(bot: Bot): void {
   bot.command('start', async (ctx) => {
+    const payload = ctx.match;
+    if (typeof payload === 'string' && payload === 'buy_replay') {
+      await sendReplayInvoice(ctx);
+      return;
+    }
+
     await ctx.reply(WELCOME, {
       parse_mode: 'Markdown',
       reply_markup: {
