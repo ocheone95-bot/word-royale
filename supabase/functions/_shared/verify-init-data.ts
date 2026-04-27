@@ -7,8 +7,9 @@
 // 3) calculated_hash = HMAC_SHA256(key=secret_key, message=data_check_string).
 // 4) calculated_hash == hash из initData → подпись валидна.
 //
-// Дополнительно проверяем auth_date — initData не должен быть старее 24 часов
-// (защита от replay).
+// Дополнительно проверяем auth_date — initData не должен быть старее 1 часа
+// (защита от replay). Telegram переотдаёт свежий initData при каждом запуске
+// Mini App, так что у живого пользователя окно никогда не близко к лимиту.
 
 export interface TelegramUser {
   id: number;
@@ -28,7 +29,7 @@ export interface VerifiedInitData {
   queryId?: string;
 }
 
-const DEFAULT_MAX_AGE_SECONDS = 24 * 60 * 60;
+const DEFAULT_MAX_AGE_SECONDS = 60 * 60;
 
 async function hmacSha256(key: BufferSource, data: string): Promise<Uint8Array> {
   const cryptoKey = await crypto.subtle.importKey(
