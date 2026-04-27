@@ -7,11 +7,8 @@ import { useGameStore } from '../store/useGameStore'
 export default function HomeScreen() {
   const user = useTelegramUser()
   const startGame = useGameStore((s) => s.startGame)
+  const showLeaderboard = useGameStore((s) => s.showLeaderboard)
   const greeting = user?.firstName ? `Hello, ${user.firstName}!` : 'Hello!'
-
-  const handlePlay = () => {
-    startGame()
-  }
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex flex-col items-center justify-center px-6 text-white">
@@ -25,10 +22,17 @@ export default function HomeScreen() {
         </p>
         <button
           type="button"
-          onClick={handlePlay}
-          className="w-full bg-purple-600 hover:bg-purple-500 active:scale-95 transition py-4 rounded-2xl text-xl font-semibold shadow-lg shadow-purple-900/50"
+          onClick={startGame}
+          className="w-full bg-purple-600 hover:bg-purple-500 active:scale-95 transition py-4 rounded-2xl text-xl font-semibold shadow-lg shadow-purple-900/50 mb-3"
         >
           Play
+        </button>
+        <button
+          type="button"
+          onClick={showLeaderboard}
+          className="w-full border border-slate-600 text-slate-200 active:scale-95 transition py-3 rounded-2xl text-base"
+        >
+          Leaderboard
         </button>
       </div>
     </main>

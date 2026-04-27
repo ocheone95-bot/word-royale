@@ -33,6 +33,7 @@ export default function ResultScreen() {
   const seed = useGameStore((s) => s.seed)
   const startGame = useGameStore((s) => s.startGame)
   const goHome = useGameStore((s) => s.goHome)
+  const showLeaderboard = useGameStore((s) => s.showLeaderboard)
   const submitStatus = useGameStore((s) => s.submitStatus)
   const submitError = useGameStore((s) => s.submitError)
   const submitCurrentSession = useGameStore((s) => s.submitCurrentSession)
@@ -77,6 +78,7 @@ export default function ResultScreen() {
           error={submitError}
           hasInitData={Boolean(initData)}
           onRetry={() => initData && void submitCurrentSession(initData)}
+          onViewLeaderboard={showLeaderboard}
         />
 
         {sorted.length > 0 ? (
@@ -122,9 +124,16 @@ interface SubmitStatusBlockProps {
   error: string | null
   hasInitData: boolean
   onRetry: () => void
+  onViewLeaderboard: () => void
 }
 
-function SubmitStatusBlock({ status, error, hasInitData, onRetry }: SubmitStatusBlockProps) {
+function SubmitStatusBlock({
+  status,
+  error,
+  hasInitData,
+  onRetry,
+  onViewLeaderboard,
+}: SubmitStatusBlockProps) {
   if (!hasInitData) {
     return (
       <p className="mb-8 text-xs text-slate-500">
@@ -138,7 +147,18 @@ function SubmitStatusBlock({ status, error, hasInitData, onRetry }: SubmitStatus
   }
 
   if (status === 'success') {
-    return <p className="mb-8 text-xs text-emerald-400">Saved to leaderboard ✓</p>
+    return (
+      <div className="mb-8 flex flex-col items-center gap-2">
+        <p className="text-xs text-emerald-400">Saved to leaderboard ✓</p>
+        <button
+          type="button"
+          onClick={onViewLeaderboard}
+          className="text-xs text-purple-300 underline active:scale-95 transition"
+        >
+          View top 100
+        </button>
+      </div>
+    )
   }
 
   return (
