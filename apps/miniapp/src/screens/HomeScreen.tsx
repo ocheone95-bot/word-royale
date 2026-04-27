@@ -1,14 +1,26 @@
-// Главный экран Mini App. Показывает приветствие с именем юзера из Telegram
-// и кнопку Play, которая переводит в игровой экран.
+// Главный экран Mini App. Показывает приветствие с именем юзера из Telegram,
+// кнопки Play, Leaderboard и Invite friends (откроет нативный Telegram-share
+// со ссылкой `t.me/word_royale_bot/play?startapp=ref_<userId>`).
 
 import { useTelegramUser } from '../hooks/useTelegramUser'
 import { useGameStore } from '../store/useGameStore'
+import {
+  buildInviteText,
+  buildPlayDeepLink,
+  buildTelegramShareLink,
+} from '../lib/share'
+import { openTelegramLink } from '../lib/telegram'
 
 export default function HomeScreen() {
   const user = useTelegramUser()
   const startGame = useGameStore((s) => s.startGame)
   const showLeaderboard = useGameStore((s) => s.showLeaderboard)
   const greeting = user?.firstName ? `Hello, ${user.firstName}!` : 'Hello!'
+
+  const handleInvite = () => {
+    const url = buildPlayDeepLink(user?.id ?? null)
+    openTelegramLink(buildTelegramShareLink(buildInviteText(), url))
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex flex-col items-center justify-center px-6 text-white">
@@ -30,9 +42,16 @@ export default function HomeScreen() {
         <button
           type="button"
           onClick={showLeaderboard}
-          className="w-full border border-slate-600 text-slate-200 active:scale-95 transition py-3 rounded-2xl text-base"
+          className="w-full border border-slate-600 text-slate-200 active:scale-95 transition py-3 rounded-2xl text-base mb-3"
         >
           Leaderboard
+        </button>
+        <button
+          type="button"
+          onClick={handleInvite}
+          className="w-full text-purple-300 active:scale-95 transition py-2 rounded-2xl text-sm"
+        >
+          📤 Invite friends
         </button>
       </div>
     </main>

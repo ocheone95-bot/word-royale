@@ -6,6 +6,13 @@
 import { useEffect } from 'react'
 import { useRawInitData } from '@telegram-apps/sdk-react'
 import { useGameStore } from '../store/useGameStore'
+import { useTelegramUser } from '../hooks/useTelegramUser'
+import {
+  buildPlayDeepLink,
+  buildShareText,
+  buildTelegramShareLink,
+} from '../lib/share'
+import { openTelegramLink } from '../lib/telegram'
 
 const ERROR_MESSAGES: Record<string, string> = {
   env_missing: 'App is not configured.',
@@ -39,6 +46,7 @@ export default function ResultScreen() {
   const submitCurrentSession = useGameStore((s) => s.submitCurrentSession)
 
   const initData = useRawInitData()
+  const tgUser = useTelegramUser()
 
   useEffect(() => {
     if (initData && submitStatus === 'idle') {
@@ -48,6 +56,21 @@ export default function ResultScreen() {
 
   const longest = foundWords.reduce((a, b) => (b.length > a.length ? b : a), '')
   const sorted = [...foundWords].sort((a, b) => b.length - a.length || a.localeCompare(b))
+
+  // Share становится активным только после серверного подтверждения. Иначе
+  // юзер мог бы расшарить «не сохранённый» результат и сбить ленту друзьям.
+  const canShare = submitStatus === 'success'
+  const handleShare = () => {
+    if (!canShare) return
+    const text = buildShareText({
+      seed,
+      score,
+      wordsCount: foundWords.length,
+      longest: longest || null,
+    })
+    const url = buildPlayDeepLink(tgUser?.id ?? null)
+    openTelegramLink(buildTelegramShareLink(text, url))
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex flex-col px-6 py-8 text-white">
@@ -98,21 +121,31 @@ export default function ResultScreen() {
           <p className="text-slate-500 mb-10">No words this round.</p>
         )}
 
-        <div className="grid grid-cols-2 gap-3 max-w-sm w-full mt-auto">
+        <div className="flex flex-col gap-3 max-w-sm w-full mt-auto">
           <button
             type="button"
-            onClick={goHome}
-            className="py-3 rounded-xl border border-slate-600 text-slate-300 active:scale-95 transition"
+            onClick={handleShare}
+            disabled={!canShare}
+            className="py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Home
+            📤 Share result
           </button>
-          <button
-            type="button"
-            onClick={startGame}
-            className="py-3 rounded-xl bg-purple-600 text-white font-semibold active:scale-95 transition"
-          >
-            Play again
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={goHome}
+              className="py-3 rounded-xl border border-slate-600 text-slate-300 active:scale-95 transition"
+            >
+              Home
+            </button>
+            <button
+              type="button"
+              onClick={startGame}
+              className="py-3 rounded-xl bg-purple-600 text-white font-semibold active:scale-95 transition"
+            >
+              Play again
+            </button>
+          </div>
         </div>
       </div>
     </main>
