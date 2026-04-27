@@ -336,12 +336,12 @@ create index idx_users_telegram_id on users(telegram_id);
 ## 🚀 Roadmap MVP (6 недель)
 
 ### Неделя 1: Фундамент
-- [ ] Setup репозитория, monorepo через npm workspaces
-- [ ] Создание React + Vite + TypeScript проекта
-- [ ] Регистрация бота через @BotFather
+- [x] Setup репозитория, monorepo через npm workspaces
+- [x] Создание React + Vite + TypeScript проекта
+- [x] Регистрация бота через @BotFather
 - [ ] Hello World в Telegram (Mini App открывается из бота)
 - [ ] Telegram SDK интеграция, получение initData юзера
-- [ ] Базовый UI: главный экран с кнопкой Play
+- [x] Базовый UI: главный экран с кнопкой Play
 - [ ] Loading и error states
 
 ### Неделя 2: Core механика
