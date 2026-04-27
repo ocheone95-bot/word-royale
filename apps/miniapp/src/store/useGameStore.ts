@@ -14,6 +14,8 @@ import {
 export type Screen = 'home' | 'game' | 'result'
 export type Feedback = null | 'success' | 'invalid' | 'duplicate' | 'too-short'
 
+export const GAME_DURATION_SECONDS = 90
+
 interface GameState {
   screen: Screen
 
@@ -24,6 +26,7 @@ interface GameState {
   foundWords: string[]
   score: number
   feedback: Feedback
+  timeLeft: number
 
   goHome: () => void
   startGame: () => void
@@ -31,6 +34,7 @@ interface GameState {
   clearSelection: () => void
   submitWord: (dict: Set<string>) => void
   clearFeedback: () => void
+  tickTimer: () => void
 }
 
 const todaySeed = getTodaySeed()
@@ -43,6 +47,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   foundWords: [],
   score: 0,
   feedback: null,
+  timeLeft: GAME_DURATION_SECONDS,
 
   goHome: () => set({ screen: 'home' }),
 
@@ -56,6 +61,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       foundWords: [],
       score: 0,
       feedback: null,
+      timeLeft: GAME_DURATION_SECONDS,
     })
   },
 
@@ -98,4 +104,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   clearFeedback: () => set({ feedback: null }),
+
+  tickTimer: () => {
+    const { timeLeft, screen } = get()
+    if (screen !== 'game' || timeLeft <= 0) return
+    const next = timeLeft - 1
+    if (next <= 0) {
+      set({ timeLeft: 0, screen: 'result', selectedIndices: [], feedback: null })
+    } else {
+      set({ timeLeft: next })
+    }
+  },
 }))

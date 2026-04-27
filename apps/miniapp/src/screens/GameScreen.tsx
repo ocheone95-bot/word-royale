@@ -14,11 +14,13 @@ export default function GameScreen() {
   const foundWords = useGameStore((s) => s.foundWords)
   const score = useGameStore((s) => s.score)
   const feedback = useGameStore((s) => s.feedback)
+  const timeLeft = useGameStore((s) => s.timeLeft)
   const goHome = useGameStore((s) => s.goHome)
   const toggleLetter = useGameStore((s) => s.toggleLetter)
   const clearSelection = useGameStore((s) => s.clearSelection)
   const clearFeedback = useGameStore((s) => s.clearFeedback)
   const submitWord = useGameStore((s) => s.submitWord)
+  const tickTimer = useGameStore((s) => s.tickTimer)
 
   // Сбрасываем feedback через 700ms — короткой подсветки достаточно
   useEffect(() => {
@@ -26,6 +28,12 @@ export default function GameScreen() {
     const t = setTimeout(clearFeedback, 700)
     return () => clearTimeout(t)
   }, [feedback, clearFeedback])
+
+  // Тик таймера раз в секунду; tickTimer сам остановится на 0 и переведёт на result
+  useEffect(() => {
+    const id = setInterval(tickTimer, 1000)
+    return () => clearInterval(id)
+  }, [tickTimer])
 
   const currentWord = selectedIndices.map((i) => letters[i] ?? '').join('')
   const previewScore = calculateScore(currentWord)
@@ -40,7 +48,7 @@ export default function GameScreen() {
         >
           ← Back
         </button>
-        <span className="text-xs text-slate-400 font-mono">{seed}</span>
+        <Timer timeLeft={timeLeft} seed={seed} />
         <span className="text-base font-bold tabular-nums">{score}</span>
       </header>
 
@@ -89,6 +97,25 @@ export default function GameScreen() {
         </div>
       )}
     </main>
+  )
+}
+
+function Timer({ timeLeft, seed }: { timeLeft: number; seed: string }) {
+  const minutes = Math.floor(timeLeft / 60)
+  const seconds = timeLeft % 60
+  const formatted = `${minutes}:${String(seconds).padStart(2, '0')}`
+  const danger = timeLeft <= 10
+  return (
+    <div className="flex flex-col items-center">
+      <span
+        className={`text-xl font-bold tabular-nums transition-colors ${
+          danger ? 'text-red-400 animate-pulse' : 'text-slate-100'
+        }`}
+      >
+        {formatted}
+      </span>
+      <span className="text-[10px] text-slate-500 font-mono">{seed}</span>
+    </div>
   )
 }
 
