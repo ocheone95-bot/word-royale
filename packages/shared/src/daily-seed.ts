@@ -14,7 +14,7 @@ const LETTER_FREQUENCY: Readonly<Record<string, number>> = {
 
 const VOWELS = new Set(['a', 'e', 'i', 'o', 'u']);
 const TOTAL_LETTERS = 7;
-const MIN_VOWELS = 2; // иначе из набора почти невозможно составить слова
+const MIN_VOWELS = 3; // 7 уникальных букв с 3+ гласными — стабильно 30-60+ слов
 
 // FNV-1a 32-bit — простой и детерминированный хэш строки
 function hashSeed(seed: string): number {
@@ -59,22 +59,32 @@ export function getTodaySeed(date: Date = new Date()): DailySeed {
 
 export function getDailyLetters(seed: DailySeed): Letters {
   const rng = mulberry32(hashSeed(seed));
+  const used = new Set<string>();
   const letters: string[] = [];
 
-  // Гарантируем минимум MIN_VOWELS гласных, иначе из набора нечего составить
+  // Сначала набираем MIN_VOWELS уникальных гласных
   const vowelWeights: Record<string, number> = {};
   for (const [l, w] of Object.entries(LETTER_FREQUENCY)) {
     if (VOWELS.has(l)) vowelWeights[l] = w;
   }
-  for (let i = 0; i < MIN_VOWELS; i++) {
-    letters.push(weightedPick(rng, vowelWeights));
+  while (letters.length < MIN_VOWELS) {
+    const v = weightedPick(rng, vowelWeights);
+    if (!used.has(v)) {
+      letters.push(v);
+      used.add(v);
+    }
   }
 
+  // Добираем оставшиеся слоты любыми буквами, тоже без повторов
   while (letters.length < TOTAL_LETTERS) {
-    letters.push(weightedPick(rng, LETTER_FREQUENCY));
+    const l = weightedPick(rng, LETTER_FREQUENCY);
+    if (!used.has(l)) {
+      letters.push(l);
+      used.add(l);
+    }
   }
 
-  // Fisher-Yates shuffle — чтобы гласные не лежали всегда в начале
+  // Fisher-Yates — чтобы гласные не оседали в начале
   for (let i = letters.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [letters[i], letters[j]] = [letters[j]!, letters[i]!];
