@@ -273,3 +273,10 @@ s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
+
+[functions.submit-score]
+# Gateway не должен валидировать JWT — мы используем новый формат
+# anon-ключа (sb_publishable_*), который dashboard выдаёт по умолчанию,
+# а он не парсится как Supabase Auth JWT. Проверяем подпись initData
+# внутри функции через HMAC bot_token.
+verify_jwt = false
