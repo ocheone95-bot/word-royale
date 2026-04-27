@@ -12,5 +12,8 @@
   },
   "scripts": {
     "seed:dictionary": "node --env-file=.env.local packages/dictionary/scripts/seed-db.mjs"
+  },
+  "devDependencies": {
+    "supabase": "^1.207.9"
   }
 }
