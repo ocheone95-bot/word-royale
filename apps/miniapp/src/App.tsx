@@ -70,11 +70,23 @@ function OpenInTelegramFallback() {
 
 function ActiveScreen() {
   const screen = useGameStore((s) => s.screen)
-  if (screen === 'game') return <GameScreen />
-  if (screen === 'result') return <ResultScreen />
-  if (screen === 'leaderboard') return <LeaderboardScreen />
-  if (screen === 'shop') return <ShopScreen />
-  return <HomeScreen />
+  const Screen =
+    screen === 'game'
+      ? GameScreen
+      : screen === 'result'
+        ? ResultScreen
+        : screen === 'leaderboard'
+          ? LeaderboardScreen
+          : screen === 'shop'
+            ? ShopScreen
+            : HomeScreen
+  // key={screen} принудительно ремаунтит wrapper при смене экрана —
+  // CSS-анимация screen-fade проигрывается на mount каждого нового экрана.
+  return (
+    <div key={screen} className="screen-fade">
+      <Screen />
+    </div>
+  )
 }
 
 // Отдельный «невидимый» компонент: реф-атрибуция требует Telegram-launch-params,

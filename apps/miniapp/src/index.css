@@ -62,3 +62,30 @@
   --tile-text-selected: rgb(20 0 30);
   --tile-order: rgb(20 0 30);
 }
+
+/* Анимации полировки. Все короткие (≤ 250 ms) — Telegram Mini Apps на
+   Android любят дёргать transitions, длинные раздражают. */
+
+@keyframes tile-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@keyframes slide-up-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes screen-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tile-pop { animation: tile-pop 220ms ease-out; }
+.slide-up-fade { animation: slide-up-fade 220ms ease-out both; }
+.screen-fade { animation: screen-fade 240ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-pop, .slide-up-fade, .screen-fade { animation: none; }
+}

@@ -213,7 +213,7 @@ function LetterTile({
       onClick={onClick}
       style={style}
       className={`relative aspect-square flex items-center justify-center rounded-2xl text-3xl font-bold uppercase transition active:scale-95 ${
-        selected ? 'border-2' : 'border'
+        selected ? 'border-2 tile-pop' : 'border'
       }`}
     >
       {letter}
@@ -246,7 +246,7 @@ function FoundWords({ words }: { words: readonly string[] }) {
         {words.map((w) => (
           <span
             key={w}
-            className="px-2 py-1 rounded-md bg-slate-800/70 border border-slate-700 text-sm uppercase font-mono"
+            className="px-2 py-1 rounded-md bg-slate-800/70 border border-slate-700 text-sm uppercase font-mono slide-up-fade"
           >
             {w}
           </span>

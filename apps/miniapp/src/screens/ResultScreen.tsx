@@ -17,6 +17,7 @@ import { openTelegramLink } from '../lib/telegram'
 import { isMonetagAvailable } from '../lib/monetag'
 import { track } from '../lib/analytics'
 import { hapticImpact } from '../lib/haptics'
+import { useTickUp } from '../hooks/useTickUp'
 
 const REPLAY_PRICE_STARS = 50
 
@@ -80,8 +81,10 @@ export default function ResultScreen() {
   }, [initData, submitStatus, submitCurrentSession])
 
   // serverScore = клиентский score × 2, если был активен Double Score boost.
-  // До серверного ответа показываем клиентский счёт.
+  // До серверного ответа показываем клиентский счёт. Tick-up анимирует от 0
+  // до текущего значения; пересчитывается, если серверный ×2 апгрейдит счёт.
   const displayScore = serverScore ?? score
+  const animatedScore = useTickUp(displayScore, 800)
   const longest = foundWords.reduce((a, b) => (b.length > a.length ? b : a), '')
   const sorted = [...foundWords].sort((a, b) => b.length - a.length || a.localeCompare(b))
 
@@ -170,7 +173,7 @@ export default function ResultScreen() {
       <div className="flex-1 flex flex-col items-center">
         <p className="text-purple-300 mb-2 text-sm uppercase tracking-widest">Time's up</p>
         <h1 className="text-7xl font-bold tracking-tight mb-1 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent tabular-nums">
-          {displayScore}
+          {animatedScore}
         </h1>
         {doubleScoreApplied && (
           <p className="mb-2 text-xs font-bold text-amber-400 uppercase tracking-widest">
