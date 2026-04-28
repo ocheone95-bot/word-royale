@@ -1,16 +1,18 @@
-// record-ad-reward: дневной счётчик rewarded ads с лимитом.
+// record-ad-reward: rewarded ad → +1 replay_credit (с дневным лимитом).
 //
 // Контракт:
 //   POST { initData } → JSON {
 //     ok: true,
-//     allowed: boolean,        // получил ли юзер бонус (false если лимит исчерпан)
-//     watchedToday: number,    // счётчик после операции
-//     maxPerDay: number,       // дневной лимит
+//     allowed: boolean,        // выдан ли replay-кредит (false если лимит исчерпан)
+//     watchedToday: number,    // счётчик ads после операции
+//     maxPerDay: number,       // дневной лимит ads (анти-чит)
+//     replayCredits: number,   // итоговое значение replay_credits после операции
 //   }
 //
 // Используется фронтом ПОСЛЕ того, как Monetag SDK подтвердил успешный показ
-// rewarded-ad. Только если allowed=true — клиент применяет бонус (например,
-// +30 сек к таймеру).
+// rewarded-ad. RPC атомарно инкрементит и счётчик ads, и replay_credits —
+// клиенту достаточно обновить todayStatus.replayCredits и юзер получит
+// «Play replay» вместо «Buy replay» на ResultScreen.
 //
 // Аутентификация — initData HMAC, как в submit-score.
 
@@ -119,6 +121,7 @@ Deno.serve(async (req) => {
     allowed: boolean;
     watched_today: number;
     max_per_day: number;
+    replay_credits: number;
   };
 
   return jsonResponse(200, {
@@ -126,5 +129,6 @@ Deno.serve(async (req) => {
     allowed: result.allowed,
     watchedToday: result.watched_today,
     maxPerDay: result.max_per_day,
+    replayCredits: result.replay_credits,
   });
 });

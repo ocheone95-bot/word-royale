@@ -3,7 +3,7 @@
 // сессию в submit-score; если что-то пошло не так — показывает причину
 // и кнопку Retry. Rate-limit «1 игра в день» подключим на Неделе 4.
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRawInitData } from '@telegram-apps/sdk-react'
 import { useGameStore } from '../store/useGameStore'
 import { useTelegramUser } from '../hooks/useTelegramUser'
@@ -14,6 +14,7 @@ import {
   buildTelegramShareLink,
 } from '../lib/share'
 import { openTelegramLink } from '../lib/telegram'
+import { isMonetagAvailable } from '../lib/monetag'
 
 const REPLAY_PRICE_STARS = 50
 
@@ -51,6 +52,9 @@ export default function ResultScreen() {
   const submitError = useGameStore((s) => s.submitError)
   const submitCurrentSession = useGameStore((s) => s.submitCurrentSession)
   const todayStatus = useGameStore((s) => s.todayStatus)
+  const watchRewardedAd = useGameStore((s) => s.watchRewardedAd)
+  const [adInProgress, setAdInProgress] = useState(false)
+  const [adError, setAdError] = useState<string | null>(null)
 
   const initData = useRawInitData()
   const tgUser = useTelegramUser()
@@ -74,9 +78,34 @@ export default function ResultScreen() {
   const knowStatus = todayStatus.loaded
   const replayCredits = knowStatus ? todayStatus.replayCredits : null
   const proActive = knowStatus && todayStatus.proActive
+  const adsWatchedToday = knowStatus ? todayStatus.adsWatchedToday : 0
+  const adsMaxPerDay = knowStatus ? todayStatus.adsMaxPerDay : 0
   // Pro обходит «Buy replay» — играть можно сколько угодно.
   const needsBuyReplay = knowStatus && replayCredits === 0 && !proActive
+  // Бесплатный replay через рекламу: SDK подключен, дневной лимит не исчерпан,
+  // и юзеру реально нужен ещё replay (нет credits, нет Pro).
+  const adReplayAvailable =
+    needsBuyReplay &&
+    isMonetagAvailable() &&
+    adsMaxPerDay > 0 &&
+    adsWatchedToday < adsMaxPerDay
   const handleBuyReplay = () => openTelegramLink(buildBuyReplayDeepLink())
+  const handleWatchAd = async () => {
+    if (!initData || adInProgress) return
+    setAdInProgress(true)
+    setAdError(null)
+    const res = await watchRewardedAd(initData)
+    setAdInProgress(false)
+    if (!res.ok) {
+      setAdError(
+        res.reason === 'limit'
+          ? 'Daily ad limit reached.'
+          : 'Ad not available right now.',
+      )
+    }
+    // На success todayStatus.replayCredits уже обновлён в стор'е — UI ниже
+    // переключится на «Play replay» автоматически.
+  }
 
   // Share становится активным после серверного подтверждения ИЛИ в случае
   // no_replay — счёт настоящий (юзер реально играл и набрал очки), просто
@@ -188,6 +217,21 @@ export default function ResultScreen() {
               </button>
             )}
           </div>
+          {adReplayAvailable && (
+            <button
+              type="button"
+              onClick={handleWatchAd}
+              disabled={adInProgress}
+              className="py-3 rounded-xl border border-amber-500/60 text-amber-300 font-medium active:scale-95 transition disabled:opacity-50"
+            >
+              {adInProgress
+                ? 'Loading ad…'
+                : `📺 Watch ad → free replay (${adsMaxPerDay - adsWatchedToday} left)`}
+            </button>
+          )}
+          {adError && (
+            <p className="text-xs text-rose-400 text-center">{adError}</p>
+          )}
         </div>
       </div>
     </main>

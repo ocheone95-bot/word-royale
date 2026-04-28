@@ -161,6 +161,7 @@ interface RecordAdRewardSuccess {
   allowed: boolean
   watchedToday: number
   maxPerDay: number
+  replayCredits: number
 }
 interface RecordAdRewardFailure {
   ok: false
@@ -202,6 +203,7 @@ export async function recordAdReward(
     allowed: Boolean(j.allowed),
     watchedToday: Number(j.watchedToday ?? 0),
     maxPerDay: Number(j.maxPerDay ?? 0),
+    replayCredits: Number(j.replayCredits ?? 0),
   }
 }
 

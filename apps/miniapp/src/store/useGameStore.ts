@@ -35,7 +35,6 @@ export type TodayStatusState =
       adsMaxPerDay: number
     }
 
-export const REWARDED_AD_BONUS_SECONDS = 30
 
 const SELECTED_THEME_KEY = 'wr.selectedTheme'
 
@@ -94,7 +93,8 @@ interface GameState {
   showShop: () => void
   startGame: () => void
   setSelectedTheme: (theme: ThemeId) => void
-  // Запускает Monetag rewarded-ad и +30s к таймеру при success.
+  // Запускает Monetag rewarded-ad → +1 replay_credit при success.
+  // Используется на ResultScreen как бесплатная альтернатива Buy replay.
   watchRewardedAd: (initData: string) => Promise<{ ok: boolean; reason?: string }>
   toggleLetter: (index: number) => void
   clearSelection: () => void
@@ -314,20 +314,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     const shown = await showRewardedAd()
     if (!shown) return { ok: false, reason: 'ad_unavailable' }
 
-    // SDK подтвердил показ — фиксируем в БД и проверяем дневной лимит.
+    // SDK подтвердил показ — фиксируем в БД (RPC атомарно инкрементит счётчик
+    // ads и replay_credits, либо отказывает по лимиту).
     const recorded = await recordAdReward(initData)
     if (!recorded.ok) return { ok: false, reason: recorded.error }
     if (!recorded.allowed) return { ok: false, reason: 'limit' }
 
-    // Бонус: +30 сек к таймеру + обновляем счётчик в локальном состоянии.
-    const { timeLeft, screen } = get()
-    if (screen === 'game' && timeLeft > 0) {
-      set({ timeLeft: timeLeft + REWARDED_AD_BONUS_SECONDS })
-    }
+    // +1 replay_credit получен. Обновляем todayStatus, чтобы UI ResultScreen
+    // тут же переключился с «Buy replay» на «Play replay (N)».
     if (status.loaded) {
       set({
         todayStatus: {
           ...status,
+          replayCredits: recorded.replayCredits,
           adsWatchedToday: recorded.watchedToday,
           adsMaxPerDay: recorded.maxPerDay,
         },
