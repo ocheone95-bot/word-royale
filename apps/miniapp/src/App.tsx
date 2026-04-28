@@ -1,17 +1,37 @@
 // Корневой компонент. Оборачивает HomeScreen в ErrorBoundary, чтобы
 // поймать ошибку SDK при запуске вне Telegram и показать понятный fallback.
 
-import { Component, useEffect, type ReactNode } from 'react'
+import { Component, useEffect, useState, type ReactNode } from 'react'
 import HomeScreen from './screens/HomeScreen'
 import GameScreen from './screens/GameScreen'
 import ResultScreen from './screens/ResultScreen'
 import LeaderboardScreen from './screens/LeaderboardScreen'
 import ShopScreen from './screens/ShopScreen'
+import OnboardingScreen from './screens/OnboardingScreen'
 import { useGameStore } from './store/useGameStore'
 import { useReferralAttribution } from './hooks/useReferralAttribution'
 import { useTelegramUser } from './hooks/useTelegramUser'
 import { identifyUser } from './lib/analytics'
 import { captureError, setSentryUser } from './lib/sentry'
+
+const ONBOARDING_DONE_KEY = 'wr.onboarding.done.v1'
+
+function readOnboardingDone(): boolean {
+  try {
+    return localStorage.getItem(ONBOARDING_DONE_KEY) === '1'
+  } catch {
+    // localStorage недоступен → считаем что показали (не блокируем юзера).
+    return true
+  }
+}
+
+function markOnboardingDone(): void {
+  try {
+    localStorage.setItem(ONBOARDING_DONE_KEY, '1')
+  } catch {
+    // Не критично — следующая сессия покажет онбординг ещё раз.
+  }
+}
 
 type State = { hasError: boolean }
 
@@ -87,11 +107,24 @@ function AnalyticsIdentifier() {
 }
 
 export default function App() {
+  const [onboardingPending, setOnboardingPending] = useState(
+    () => !readOnboardingDone(),
+  )
+
+  const finishOnboarding = () => {
+    markOnboardingDone()
+    setOnboardingPending(false)
+  }
+
   return (
     <TelegramErrorBoundary>
       <ReferralAttributor />
       <AnalyticsIdentifier />
-      <ActiveScreen />
+      {onboardingPending ? (
+        <OnboardingScreen onComplete={finishOnboarding} />
+      ) : (
+        <ActiveScreen />
+      )}
     </TelegramErrorBoundary>
   )
 }
