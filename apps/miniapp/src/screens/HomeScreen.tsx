@@ -182,11 +182,48 @@ export default function HomeScreen() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          minHeight: 28,
+          minHeight: 32,
         }}
       >
         <StreakChip days={1} />
-        {proActive ? <ProBadge /> : <span style={{ width: 1 }} />}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          {proActive && <ProBadge />}
+          <button
+            type="button"
+            onClick={handleToggleSound}
+            aria-pressed={soundOn}
+            aria-label={soundOn ? 'Sound on' : 'Sound off'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 12px',
+              background: soundOn
+                ? 'rgba(212,168,73,0.18)'
+                : 'rgba(0,0,0,0.35)',
+              border: `1px solid ${
+                soundOn ? 'rgba(212,168,73,0.55)' : 'rgba(244,228,188,0.18)'
+              }`,
+              borderRadius: 8,
+              boxShadow: soundOn ? '0 0 8px rgba(212,168,73,0.3)' : 'none',
+              color: soundOn
+                ? 'var(--accent-brass-hi)'
+                : 'var(--text-parchment-dim)',
+              fontFamily: 'var(--font-pixel)',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: 1.4,
+              textTransform: 'uppercase',
+              lineHeight: 1,
+              cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: 32,
+            }}
+          >
+            <SpeakerIcon on={soundOn} />
+            {soundOn ? 'On' : 'Off'}
+          </button>
+        </div>
       </header>
 
       <div
@@ -368,25 +405,6 @@ export default function HomeScreen() {
         >
           Invite friends
         </SaloonButton>
-        <button
-          type="button"
-          onClick={handleToggleSound}
-          aria-pressed={soundOn}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--text-ash)',
-            fontFamily: 'var(--font-pixel)',
-            fontSize: 10,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-            padding: '4px 8px',
-            cursor: 'pointer',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          Sound · {soundOn ? 'On' : 'Off'}
-        </button>
       </div>
 
       <div
@@ -403,5 +421,47 @@ export default function HomeScreen() {
         </Card>
       </div>
     </main>
+  )
+}
+
+// Маленькая SVG-иконка динамика (12×12). Когда звук выкл — рисуем
+// strike-through, чтобы было сразу понятно без чтения текста рядом.
+function SpeakerIcon({ on }: { on: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ flexShrink: 0 }}
+      aria-hidden="true"
+    >
+      <path
+        d="M2 4.5 L4 4.5 L7 2 L7 10 L4 7.5 L2 7.5 Z"
+        fill="currentColor"
+      />
+      {on ? (
+        <>
+          <path
+            d="M8.5 4.5 Q9.5 6 8.5 7.5"
+            stroke="currentColor"
+            strokeWidth="1"
+            fill="none"
+            strokeLinecap="round"
+          />
+        </>
+      ) : (
+        <line
+          x1="8"
+          y1="3.5"
+          x2="11"
+          y2="8.5"
+          stroke="currentColor"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+        />
+      )}
+    </svg>
   )
 }
