@@ -51,6 +51,9 @@ export function PixelSprite({
         position: 'relative',
         width: w * scale,
         height: h * scale,
+        // Чисто декоративный спрайт — не должен ловить тапы поверх
+        // интерактивных карточек, особенно при shrink на маленьких экранах.
+        pointerEvents: 'none',
         ...style,
       }}
     >

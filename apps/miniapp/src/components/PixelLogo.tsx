@@ -190,6 +190,8 @@ export function PixelLogo({
         width: w * scale,
         height: h * scale,
         filter: buildGlow(scale, glow, glowStrength),
+        // Чисто декоративный — не ловит тапы.
+        pointerEvents: 'none',
         ...style,
       }}
     >

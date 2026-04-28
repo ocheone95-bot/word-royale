@@ -19,6 +19,7 @@ import { track } from '../lib/analytics'
 import { hapticImpact } from '../lib/haptics'
 import { isSoundEnabled, setSoundEnabled } from '../lib/sounds'
 import { dayNumberSinceLaunch } from '../lib/day-number'
+import { useViewportWidth } from '../hooks/useViewportWidth'
 import { Mostaccio } from '../components/Mostaccio'
 import { PixelLogo } from '../components/PixelLogo'
 import {
@@ -73,6 +74,11 @@ export default function HomeScreen() {
   const letters = useGameStore((s) => s.letters)
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled())
   const timeLeft = useTimeUntilMidnightUTC()
+  const viewportWidth = useViewportWidth()
+  // ROYALE — самое широкое слово, 6 букв × (7px + 1 gap) - 1 = 47px при scale=1.
+  // Подбираем scale так, чтобы влезать в viewport с 18px padding-inline по бокам.
+  // Дефолт scale=5 → 235px. На <= 360px (iPhone SE/old Android) даунгрейдим до 4.
+  const logoScale = viewportWidth > 0 && viewportWidth <= 360 ? 4 : 5
 
   useEffect(() => {
     if (!initData) return
@@ -171,10 +177,10 @@ export default function HomeScreen() {
           gap: 4,
         }}
       >
-        <PixelLogo text="WORD" scale={5} color="#ff8c42" glow="#ff8c42" />
+        <PixelLogo text="WORD" scale={logoScale} color="#ff8c42" glow="#ff8c42" />
         <PixelLogo
           text="ROYALE"
-          scale={5}
+          scale={logoScale}
           color="#f4e4bc"
           glow="#ff8c42"
           glowStrength="md"
