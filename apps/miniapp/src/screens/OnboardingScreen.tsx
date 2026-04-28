@@ -1,39 +1,39 @@
-// 3-слайдовый онбординг для новичков. Показывается один раз — флаг
-// в localStorage. Skip и финальный Get Started ведут в одно и то же
-// место (HomeScreen), но трекаются как разные события.
+// 3-слайдовый онбординг с Mostaccio как guide. Saloon-палитра, pixel
+// логотип на 1-м экране, кот ведёт через шаги (wink → point → crown).
+// Skip / Next / Get started кнопки. Логика track + onComplete сохранена.
 
 import { useEffect, useState } from 'react'
 import { track } from '../lib/analytics'
 import { hapticImpact } from '../lib/haptics'
+import { Mostaccio, type MostaccioPose } from '../components/Mostaccio'
+import { PixelLogo } from '../components/PixelLogo'
+import { SaloonButton } from '../components/saloon'
 
 interface OnboardingScreenProps {
   onComplete: (reason: 'completed' | 'skipped') => void
 }
 
 interface Slide {
+  pose: MostaccioPose
   title: string
-  description: string
-  visual: () => React.ReactElement
+  body: string
 }
 
 const SLIDES: readonly Slide[] = [
   {
-    title: 'Make words from 7 letters',
-    description:
-      'Tap letters to build words. Longer words score more. You have 90 seconds.',
-    visual: () => <LettersVisual letters={['W', 'O', 'R', 'D']} />,
+    pose: 'smile',
+    title: 'Hi, I’m Mostaccio',
+    body: 'Welcome to the Saloon. Tap letters to make words — longer is better.',
   },
   {
-    title: 'Same letters for everyone',
-    description:
-      'Every player in the world gets the same 7 letters today. Come back tomorrow for a new set.',
-    visual: () => <DailyVisual />,
+    pose: 'point',
+    title: 'Same letters worldwide',
+    body: 'Every player gets the same 7 letters today. New round at midnight UTC.',
   },
   {
-    title: 'Share & invite friends',
-    description:
-      'Show off your score with a Wordle-style share. Invite friends to compete on a private leaderboard.',
-    visual: () => <ShareVisual />,
+    pose: 'pro',
+    title: 'Climb the leaderboard',
+    body: 'Share your score, beat your friends. The crown is yours to take.',
   },
 ] as const
 
@@ -69,83 +69,142 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex flex-col px-6 py-8 text-white">
-      <div className="flex justify-end">
+    <main
+      style={{
+        minHeight: '100vh',
+        position: 'relative',
+        background:
+          'radial-gradient(circle at 50% 0%, rgba(255,140,66,0.18) 0%, transparent 50%), var(--bg-room)',
+        color: 'var(--text-parchment)',
+        paddingInline: 24,
+        paddingTop: 16,
+        paddingBottom: 28,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          minHeight: 24,
+        }}
+      >
         {!isLast && (
           <button
             type="button"
             onClick={handleSkip}
-            className="text-slate-400 active:scale-95 transition text-sm"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-ash)',
+              fontFamily: 'var(--font-ui)',
+              fontSize: 13,
+              padding: '4px 8px',
+              cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent',
+            }}
           >
             Skip
           </button>
         )}
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-        <div className="mb-8 h-32 flex items-center justify-center">
-          {slide.visual()}
+      {step === 0 && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            marginTop: 4,
+            gap: 4,
+          }}
+        >
+          <PixelLogo text="WORD" scale={4} color="#ff8c42" glow="#ff8c42" />
+          <PixelLogo
+            text="ROYALE"
+            scale={4}
+            color="#f4e4bc"
+            glow="#ff8c42"
+            glowStrength="md"
+          />
         </div>
-        <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+      )}
+
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          maxWidth: 320,
+          margin: '0 auto',
+          gap: 22,
+          paddingBlock: 24,
+        }}
+      >
+        <Mostaccio pose={slide.pose} scale={3.5} />
+        <h2
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 26,
+            fontWeight: 400,
+            color: 'var(--text-parchment)',
+            margin: 0,
+            lineHeight: 1.15,
+          }}
+        >
           {slide.title}
         </h2>
-        <p className="text-slate-300 text-base">{slide.description}</p>
+        <p
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 15,
+            color: 'var(--text-parchment-dim)',
+            margin: 0,
+            lineHeight: 1.45,
+          }}
+        >
+          {slide.body}
+        </p>
       </div>
 
-      <div className="flex flex-col items-center gap-6 mb-2">
-        <div className="flex gap-2" aria-label="Onboarding progress">
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 18,
+        }}
+      >
+        <div style={{ display: 'flex', gap: 8 }} aria-label="Onboarding progress">
           {SLIDES.map((_, i) => (
             <span
               key={i}
-              className={`h-2 rounded-full transition-all ${
-                i === step
-                  ? 'w-8 bg-purple-400'
-                  : 'w-2 bg-slate-700'
-              }`}
+              style={{
+                height: 6,
+                width: i === step ? 28 : 6,
+                borderRadius: 999,
+                background:
+                  i === step ? 'var(--accent-lamp)' : 'var(--bg-leather)',
+                boxShadow:
+                  i === step ? '0 0 8px rgba(255,140,66,0.6)' : 'none',
+                transition: 'width 200ms ease-out',
+              }}
             />
           ))}
         </div>
-        <button
-          type="button"
+        <SaloonButton
+          variant="primary"
+          size="lg"
+          fullWidth
           onClick={handleNext}
-          className="w-full max-w-sm bg-purple-600 hover:bg-purple-500 active:scale-95 transition py-4 rounded-2xl text-lg font-semibold shadow-lg shadow-purple-900/50"
         >
-          {isLast ? 'Get started' : 'Next'}
-        </button>
+          {isLast ? 'Start playing' : 'Next'}
+        </SaloonButton>
       </div>
     </main>
-  )
-}
-
-function LettersVisual({ letters }: { letters: readonly string[] }) {
-  return (
-    <div className="flex gap-2">
-      {letters.map((letter, i) => (
-        <div
-          key={i}
-          className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold border-2"
-          style={{
-            background: 'var(--tile-bg-selected)',
-            borderColor: 'var(--tile-border-selected)',
-            color: 'var(--tile-text-selected)',
-            boxShadow: '0 8px 12px -4px var(--tile-shadow-selected)',
-          }}
-        >
-          {letter}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function DailyVisual() {
-  return (
-    <div className="text-6xl">🗓️</div>
-  )
-}
-
-function ShareVisual() {
-  return (
-    <div className="text-6xl">📤</div>
   )
 }
