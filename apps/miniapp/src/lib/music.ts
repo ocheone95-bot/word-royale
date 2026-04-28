@@ -1,203 +1,198 @@
-// Фоновая chiptune-музыка через WebAudio. Никаких mp3-ассетов в бандле —
-// генерим осцилляторами на лету. Saloon-style honky-tonk walking pattern
-// в 8-bit chiptune исполнении: square-wave melody поверх triangle-wave bass.
+// Фоновая lo-fi музыка через WebAudio. Без mp3-ассетов — генерим
+// осцилляторами на лету. Стиль: classic ii-V-I-vi прогрессия в C major,
+// 75 BPM, sine-pad с лёгким detune (chorus warmth), bass на каждом такте,
+// мягкий hi-hat шейк, lowpass 1.6 kHz сверху всей шины (lo-fi feel).
 //
-// 4 такта в C major (I-I-IV-V), 100 BPM, 4/4. Loop ~9.6 сек, повторяется
-// бесконечно через lookahead-scheduler (обычная техника WebAudio sequencer).
+// 4 такта × 4 beats × 0.8s = 12.8 сек loop, повторяется бесконечно через
+// lookahead-scheduler. Громкость master 0.06 — заметно тише комфортного
+// разговорного уровня, не перебивает sfx.
 //
-// Громкость держим тихо (master 0.025) чтобы не задушить sfx и чтобы юзеры
-// не выключали через 5 секунд. Управляется единым sound toggle —
-// startMusic/stopMusic вызываются из setSoundEnabled() в lib/sounds.ts.
+// Управляется единым sound toggle: setSoundEnabled() → start/stopMusic().
 
 import { getSharedAudioContext } from './sounds'
 
-const BPM = 100
-const BEAT_S = 60 / BPM // 0.6 sec
-const EIGHTH_S = BEAT_S / 2 // 0.3 sec
+const BPM = 75
+const BEAT_S = 60 / BPM // 0.8 sec
+const BAR_S = 4 * BEAT_S // 3.2 sec
+const BARS = 4
+const LOOP_S = BARS * BAR_S // 12.8 sec
 
-interface NoteEvent {
-  freq: number
-  time: number // offset от начала loop'а, секунды
-  duration: number
-  type: OscillatorType
-  gain: number
+interface ChordSpec {
+  // Root note (для bass) и intervals в полутонах от root для аккорда (pad).
+  root: { name: string; octave: number }
+  intervals: number[]
 }
 
-// MIDI note → frequency. C4 = 261.63 Hz.
-function note(name: string, octave: number): number {
-  const SEMITONES: Record<string, number> = {
-    C: 0,
-    D: 2,
-    E: 4,
-    F: 5,
-    G: 7,
-    A: 9,
-    B: 11,
+function noteFreq(name: string, octave: number, semitoneShift = 0): number {
+  const SEMI: Record<string, number> = {
+    C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11,
   }
-  const semi = SEMITONES[name]
+  const semi = SEMI[name]
   if (semi === undefined) return 0
-  // A4 (440 Hz) = MIDI 69. C4 = MIDI 60.
-  const midi = semi + (octave + 1) * 12
+  // A4 = MIDI 69 = 440 Hz
+  const midi = semi + (octave + 1) * 12 + semitoneShift
   return 440 * Math.pow(2, (midi - 69) / 12)
 }
 
-// Bar-builder: каждый bar 4 beats × 0.6s = 2.4 sec.
-// Bass: 4 четверти. Melody: 8 восьмых.
-function buildBar(
-  barIndex: number,
-  bassNotes: ReadonlyArray<[string, number]>,
-  melodyNotes: ReadonlyArray<[string, number]>,
-): NoteEvent[] {
-  const events: NoteEvent[] = []
-  const barStart = barIndex * 4 * BEAT_S
+// ii-V-I-vi: Dm7 - G7 - Cmaj7 - Am7. Lo-fi классика, тёплая.
+const PROGRESSION: ChordSpec[] = [
+  // Dm7 = D F A C → root D + [0, 3, 7, 10]
+  { root: { name: 'D', octave: 3 }, intervals: [0, 3, 7, 10] },
+  // G7 = G B D F → root G + [0, 4, 7, 10]
+  { root: { name: 'G', octave: 2 }, intervals: [0, 4, 7, 10] },
+  // Cmaj7 = C E G B → root C + [0, 4, 7, 11]
+  { root: { name: 'C', octave: 3 }, intervals: [0, 4, 7, 11] },
+  // Am7 = A C E G → root A + [0, 3, 7, 10]
+  { root: { name: 'A', octave: 2 }, intervals: [0, 3, 7, 10] },
+]
 
-  // Bass: 4 quarter-notes (triangle, тёплый low-end)
-  for (let i = 0; i < 4; i++) {
-    const [n, oct] = bassNotes[i % bassNotes.length]!
-    events.push({
-      freq: note(n, oct),
-      time: barStart + i * BEAT_S,
-      duration: BEAT_S * 0.85,
-      type: 'triangle',
-      gain: 0.5, // относительно masterGain
-    })
-  }
-
-  // Melody: 8 eighth-notes (square, ярко-chiptune)
-  for (let i = 0; i < 8; i++) {
-    const [n, oct] = melodyNotes[i % melodyNotes.length]!
-    events.push({
-      freq: note(n, oct),
-      time: barStart + i * EIGHTH_S,
-      duration: EIGHTH_S * 0.7,
-      type: 'square',
-      gain: 0.25,
-    })
-  }
-
-  return events
+interface PadVoice {
+  freq: number
+  gain: number
+  detuneCents: number
 }
 
-// 4 такта walking honky-tonk: I - I - IV - V → loop назад в I.
-// Bar 1-2: Cmaj. Bar 3: Fmaj. Bar 4: Gmaj (доминанта, тянет в Cmaj первого).
-function buildPattern(): { events: NoteEvent[]; duration: number } {
-  const events: NoteEvent[] = []
-
-  // Bar 1: Cmaj — bass C2/G2 ostinato, melody C-arpeggio
-  events.push(
-    ...buildBar(
-      0,
-      [
-        ['C', 2],
-        ['G', 2],
-      ],
-      [
-        ['C', 5],
-        ['E', 5],
-        ['G', 5],
-        ['E', 5],
-      ],
-    ),
-  )
-
-  // Bar 2: Cmaj — bass та же, melody поднимается выше
-  events.push(
-    ...buildBar(
-      1,
-      [
-        ['C', 2],
-        ['G', 2],
-      ],
-      [
-        ['E', 5],
-        ['G', 5],
-        ['C', 6],
-        ['G', 5],
-      ],
-    ),
-  )
-
-  // Bar 3: Fmaj (IV) — bass F2/C3, melody F-arpeggio
-  events.push(
-    ...buildBar(
-      2,
-      [
-        ['F', 2],
-        ['C', 3],
-      ],
-      [
-        ['F', 5],
-        ['A', 5],
-        ['C', 6],
-        ['A', 5],
-      ],
-    ),
-  )
-
-  // Bar 4: Gmaj (V) — bass G2/D3, melody G-arpeggio (resolves в C bar1)
-  events.push(
-    ...buildBar(
-      3,
-      [
-        ['G', 2],
-        ['D', 3],
-      ],
-      [
-        ['G', 5],
-        ['B', 5],
-        ['D', 6],
-        ['B', 5],
-      ],
-    ),
-  )
-
-  const duration = 4 * 4 * BEAT_S // 4 bars × 4 beats × 0.6s = 9.6s
-  return { events, duration }
+function buildPadVoices(chord: ChordSpec): PadVoice[] {
+  const voices: PadVoice[] = []
+  // Pad — три верхних голоса аккорда в октаве 4-5, с лёгким detune для warmth.
+  for (let i = 0; i < chord.intervals.length; i++) {
+    const semi = chord.intervals[i]!
+    // Поднимаем pad-voices на октаву от bass-root, чтобы не толкаться с басом.
+    const freq = noteFreq(chord.root.name, chord.root.octave + 1, semi)
+    voices.push({ freq, gain: 0.18, detuneCents: 0 })
+    // Лёгкий "хорус": тот же тон, чуть-чуть detuned, тише — даёт widening.
+    voices.push({ freq, gain: 0.09, detuneCents: 6 })
+    voices.push({ freq, gain: 0.09, detuneCents: -6 })
+  }
+  return voices
 }
 
-const PATTERN = buildPattern()
+// === State & nodes ===
 
 let masterGain: GainNode | null = null
+let lowpass: BiquadFilterNode | null = null
 let isRunning = false
 let nextLoopTime = 0
 let scheduleTimer: number | null = null
 
-const SCHEDULE_AHEAD_S = 0.5
+const SCHEDULE_AHEAD_S = 0.6
 const TICK_INTERVAL_MS = 250
 
-function scheduleNote(
+function schedulePadChord(
   audio: AudioContext,
-  master: GainNode,
-  ev: NoteEvent,
+  destination: AudioNode,
+  chord: ChordSpec,
   startAt: number,
+  durationSec: number,
+): void {
+  const voices = buildPadVoices(chord)
+  for (const v of voices) {
+    const osc = audio.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.value = v.freq
+    osc.detune.value = v.detuneCents
+
+    const env = audio.createGain()
+    // Slow attack/release — мягкий pad, без щелчков.
+    env.gain.setValueAtTime(0, startAt)
+    env.gain.linearRampToValueAtTime(v.gain, startAt + 0.25)
+    env.gain.setValueAtTime(v.gain, startAt + durationSec - 0.4)
+    env.gain.exponentialRampToValueAtTime(0.0001, startAt + durationSec)
+
+    osc.connect(env).connect(destination)
+    osc.start(startAt)
+    osc.stop(startAt + durationSec + 0.05)
+  }
+}
+
+function scheduleBass(
+  audio: AudioContext,
+  destination: AudioNode,
+  chord: ChordSpec,
+  startAt: number,
+  durationSec: number,
 ): void {
   const osc = audio.createOscillator()
+  osc.type = 'sine'
+  osc.frequency.value = noteFreq(chord.root.name, chord.root.octave - 1)
+
   const env = audio.createGain()
-  osc.type = ev.type
-  osc.frequency.value = ev.freq
-
-  // ADSR-стиль envelope. Короткий attack (без щелчка), 50% sustain, decay в 0.
   env.gain.setValueAtTime(0, startAt)
-  env.gain.linearRampToValueAtTime(ev.gain, startAt + 0.008)
-  env.gain.linearRampToValueAtTime(ev.gain * 0.5, startAt + ev.duration * 0.4)
-  env.gain.exponentialRampToValueAtTime(0.0001, startAt + ev.duration)
+  env.gain.linearRampToValueAtTime(0.5, startAt + 0.04)
+  env.gain.setValueAtTime(0.5, startAt + 0.1)
+  env.gain.exponentialRampToValueAtTime(0.0001, startAt + durationSec)
 
-  osc.connect(env).connect(master)
+  osc.connect(env).connect(destination)
   osc.start(startAt)
-  osc.stop(startAt + ev.duration + 0.05)
+  osc.stop(startAt + durationSec + 0.05)
+}
+
+let noiseBuffer: AudioBuffer | null = null
+
+function getNoiseBuffer(audio: AudioContext): AudioBuffer {
+  if (noiseBuffer && noiseBuffer.sampleRate === audio.sampleRate) {
+    return noiseBuffer
+  }
+  const len = audio.sampleRate * 0.15
+  const buffer = audio.createBuffer(1, len, audio.sampleRate)
+  const data = buffer.getChannelData(0)
+  for (let i = 0; i < len; i++) {
+    data[i] = Math.random() * 2 - 1
+  }
+  noiseBuffer = buffer
+  return buffer
+}
+
+function scheduleHat(
+  audio: AudioContext,
+  destination: AudioNode,
+  startAt: number,
+): void {
+  const src = audio.createBufferSource()
+  src.buffer = getNoiseBuffer(audio)
+
+  // Bandpass высоко чтобы получить «ts» шейк.
+  const bp = audio.createBiquadFilter()
+  bp.type = 'bandpass'
+  bp.frequency.value = 7000
+  bp.Q.value = 0.7
+
+  const env = audio.createGain()
+  env.gain.setValueAtTime(0, startAt)
+  env.gain.linearRampToValueAtTime(0.18, startAt + 0.005)
+  env.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.06)
+
+  src.connect(bp).connect(env).connect(destination)
+  src.start(startAt)
+  src.stop(startAt + 0.1)
+}
+
+function scheduleLoopFrom(audio: AudioContext, destination: AudioNode, t0: number): void {
+  for (let bar = 0; bar < BARS; bar++) {
+    const chord = PROGRESSION[bar]!
+    const barStart = t0 + bar * BAR_S
+
+    // Pad — целиком на bar
+    schedulePadChord(audio, destination, chord, barStart, BAR_S - 0.05)
+    // Bass — root note на 1 beat (короткий attack), потом тишина
+    scheduleBass(audio, destination, chord, barStart, BEAT_S * 1.2)
+    // Hi-hat: на 2 и 4 beats каждого bar (типичный backbeat акцент)
+    scheduleHat(audio, destination, barStart + 1 * BEAT_S)
+    scheduleHat(audio, destination, barStart + 3 * BEAT_S)
+    // Light off-beats: 16-е на «и» 2 и 4
+    scheduleHat(audio, destination, barStart + 1.5 * BEAT_S)
+    scheduleHat(audio, destination, barStart + 3.5 * BEAT_S)
+  }
 }
 
 function tick(): void {
   if (!isRunning) return
   const audio = getSharedAudioContext()
-  if (!audio || !masterGain) return
+  if (!audio || !lowpass) return
 
-  // Lookahead scheduler: пока окно свободно — раскладываем следующую копию loop'а.
   while (nextLoopTime < audio.currentTime + SCHEDULE_AHEAD_S) {
-    for (const ev of PATTERN.events) {
-      scheduleNote(audio, masterGain, ev, nextLoopTime + ev.time)
-    }
-    nextLoopTime += PATTERN.duration
+    scheduleLoopFrom(audio, lowpass, nextLoopTime)
+    nextLoopTime += LOOP_S
   }
 
   scheduleTimer = window.setTimeout(tick, TICK_INTERVAL_MS)
@@ -207,15 +202,20 @@ export function startMusic(): void {
   if (isRunning) return
   const audio = getSharedAudioContext()
   if (!audio) return
-  // Resume на случай если контекст suspended (autoplay policy после mount).
-  // Если резюм не пройдёт — нота упадёт в гордой тишине, не критично.
   if (audio.state === 'suspended') {
     void audio.resume()
   }
 
+  // Lowpass снимает яркие частоты — типичный lo-fi эффект «играет в комнате».
+  lowpass = audio.createBiquadFilter()
+  lowpass.type = 'lowpass'
+  lowpass.frequency.value = 1600
+  lowpass.Q.value = 0.5
+
   masterGain = audio.createGain()
-  // Тихо: BGM не должна перебивать sfx и не должна раздражать.
-  masterGain.gain.value = 0.025
+  masterGain.gain.value = 0.06
+
+  lowpass.connect(masterGain)
   masterGain.connect(audio.destination)
 
   isRunning = true
@@ -232,14 +232,16 @@ export function stopMusic(): void {
     scheduleTimer = null
   }
 
-  if (masterGain) {
+  if (masterGain && lowpass) {
     const audio = getSharedAudioContext()
     const g = masterGain
+    const lp = lowpass
     masterGain = null
+    lowpass = null
     if (audio) {
       try {
         g.gain.setValueAtTime(g.gain.value, audio.currentTime)
-        g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.15)
+        g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.2)
       } catch {
         // ignore
       }
@@ -247,10 +249,11 @@ export function stopMusic(): void {
     setTimeout(() => {
       try {
         g.disconnect()
+        lp.disconnect()
       } catch {
         // ignore
       }
-    }, 250)
+    }, 300)
   }
 }
 

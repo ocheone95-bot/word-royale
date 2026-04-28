@@ -70,8 +70,13 @@ export function buildBuyThemeDeepLink(themeId: string): string {
 }
 
 export function buildTelegramShareLink(text: string, url: string): string {
-  const params = new URLSearchParams({ url, text })
-  return `https://t.me/share/url?${params.toString()}`
+  // encodeURIComponent кодирует пробелы как %20. URLSearchParams делает
+  // form-urlencoded (пробел → +), и Telegram-клиент в некоторых местах
+  // показывает плюсики дословно вместо пробелов.
+  return (
+    `https://t.me/share/url?url=${encodeURIComponent(url)}` +
+    `&text=${encodeURIComponent(text)}`
+  )
 }
 
 // Текст для кнопки Invite на HomeScreen (нет ещё результата, нечего хвастаться).

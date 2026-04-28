@@ -343,9 +343,7 @@ export default function HomeScreen() {
                 onClick={handleWatchAd}
                 disabled={adInProgress}
               >
-                {adInProgress
-                  ? 'Loading ad…'
-                  : `Watch ad → free replay (${adsMaxPerDay - adsWatchedToday} left)`}
+                {adInProgress ? 'Loading ad…' : 'Watch ad → free replay'}
               </SaloonButton>
             )}
           </div>

@@ -9,6 +9,7 @@ const FEEDBACK_PREFILL =
   'Word Royale feedback: '
 
 export function buildFeedbackDeepLink(): string {
-  const params = new URLSearchParams({ text: FEEDBACK_PREFILL })
-  return `https://t.me/${FEEDBACK_USERNAME}?${params.toString()}`
+  // encodeURIComponent (пробел → %20) вместо URLSearchParams (пробел → +) —
+  // иначе Telegram кое-где показывает плюсики дословно.
+  return `https://t.me/${FEEDBACK_USERNAME}?text=${encodeURIComponent(FEEDBACK_PREFILL)}`
 }

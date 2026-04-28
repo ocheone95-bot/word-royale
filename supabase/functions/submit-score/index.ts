@@ -236,6 +236,18 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Реферальная награда: если этот юзер был приглашён кем-то и реферал
+  // ещё не оплачен, начисляем referrer'у +1 replay credit. Идемпотентно;
+  // ошибки RPC не считаем фатальными для submit-score.
+  try {
+    await supabase.rpc('grant_referral_reward', {
+      p_referred_user_id: userRow.id,
+      p_reward_credits: 1,
+    });
+  } catch {
+    // ignore
+  }
+
   // score_applied = expectedScore × 2, если double_score_used=true. Возвращаем
   // клиенту его, чтобы UI и лидерборд показали один и тот же финальный счёт.
   return jsonResponse(200, {

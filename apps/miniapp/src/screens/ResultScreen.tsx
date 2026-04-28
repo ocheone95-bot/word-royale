@@ -343,7 +343,7 @@ export default function ResultScreen() {
           >
             {adInProgress
               ? 'Loading ad…'
-              : `Watch ad → free replay (${adsMaxPerDay - adsWatchedToday} left)`}
+              : 'Watch ad → free replay'}
           </SaloonButton>
         )}
         {adError && (

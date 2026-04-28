@@ -18,6 +18,8 @@ import {
   loadOnboardingDone,
   markOnboardingDone,
 } from './lib/onboarding-storage'
+import { isSoundEnabled } from './lib/sounds'
+import { startMusic, isMusicPlaying } from './lib/music'
 
 type State = { hasError: boolean }
 
@@ -106,6 +108,32 @@ function AnalyticsIdentifier() {
   return null
 }
 
+// Хук — поднимает фоновую музыку на первом любом user-gesture, чтобы
+// обойти autoplay policy. Если sound выключен — ничего не делает.
+// Срабатывает один раз: после старта снимает свои listener'ы.
+function useMusicAutostart() {
+  useEffect(() => {
+    const tryStart = () => {
+      if (!isSoundEnabled() || isMusicPlaying()) return
+      startMusic()
+    }
+    const onGesture = () => {
+      tryStart()
+      document.removeEventListener('pointerdown', onGesture)
+      document.removeEventListener('keydown', onGesture)
+      document.removeEventListener('touchstart', onGesture)
+    }
+    document.addEventListener('pointerdown', onGesture, { once: false })
+    document.addEventListener('keydown', onGesture, { once: false })
+    document.addEventListener('touchstart', onGesture, { once: false })
+    return () => {
+      document.removeEventListener('pointerdown', onGesture)
+      document.removeEventListener('keydown', onGesture)
+      document.removeEventListener('touchstart', onGesture)
+    }
+  }, [])
+}
+
 // Минимальный splash на время async-чтения CloudStorage. Цвет совпадает
 // с --bg-room чтобы переход в Home/Onboarding не флэшил белым.
 function BootSplash() {
@@ -141,6 +169,8 @@ export default function App() {
     markOnboardingDone()
     setOnboardingPending(false)
   }
+
+  useMusicAutostart()
 
   return (
     <TelegramErrorBoundary>
