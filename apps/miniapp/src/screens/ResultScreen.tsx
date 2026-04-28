@@ -73,7 +73,9 @@ export default function ResultScreen() {
   // submit'е, либо спишется кредит, либо вернётся ошибка no_replay.
   const knowStatus = todayStatus.loaded
   const replayCredits = knowStatus ? todayStatus.replayCredits : null
-  const needsBuyReplay = knowStatus && replayCredits === 0
+  const proActive = knowStatus && todayStatus.proActive
+  // Pro обходит «Buy replay» — играть можно сколько угодно.
+  const needsBuyReplay = knowStatus && replayCredits === 0 && !proActive
   const handleBuyReplay = () => openTelegramLink(buildBuyReplayDeepLink())
 
   // Share становится активным после серверного подтверждения ИЛИ в случае
@@ -178,9 +180,11 @@ export default function ResultScreen() {
                 onClick={startGame}
                 className="py-3 rounded-xl bg-purple-600 text-white font-semibold active:scale-95 transition"
               >
-                {replayCredits !== null && replayCredits > 0
-                  ? `Play replay (${replayCredits})`
-                  : 'Play again'}
+                {proActive
+                  ? 'Play another'
+                  : replayCredits !== null && replayCredits > 0
+                    ? `Play replay (${replayCredits})`
+                    : 'Play again'}
               </button>
             )}
           </div>

@@ -56,12 +56,15 @@ export default function ShopScreen() {
   const ownedThemes = todayStatus.loaded ? todayStatus.themes : []
   const doubleScoreActive =
     todayStatus.loaded && todayStatus.doubleScoreActive
+  const proActive = todayStatus.loaded && todayStatus.proActive
+  const proExpiresAt = todayStatus.loaded ? todayStatus.proExpiresAt : null
 
   const handleBuyReplay = () => openTelegramLink(buildBuyReplayDeepLink())
   const handleBuyTheme = (id: ThemeId) =>
     openTelegramLink(buildBuyThemeDeepLink(id))
   const handleBuyDoubleScore = () =>
     openTelegramLink(buildBuyDeepLink('double_score'))
+  const handleBuyPro = () => openTelegramLink(buildBuyDeepLink('pro_subscription'))
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 px-6 py-8 text-white">
@@ -119,10 +122,15 @@ export default function ShopScreen() {
         <Section title="Subscription">
           <ShopCard
             title="Word Pro"
-            description="Unlimited daily plays, all themes, no rate limit."
+            description="Unlimited daily plays + all themes for one month."
             price="150 ⭐ / month"
-            disabled
-            disabledLabel="Coming soon"
+            badge={
+              proActive && proExpiresAt
+                ? `Active · until ${new Date(proExpiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                : null
+            }
+            buyLabel={proActive ? 'Renew · 150 ⭐' : 'Buy · 150 ⭐ / month'}
+            onBuy={handleBuyPro}
           />
         </Section>
       </div>
@@ -152,6 +160,7 @@ interface ShopCardProps {
   description: string
   price: string
   badge?: string | null
+  buyLabel?: string
   disabled?: boolean
   disabledLabel?: string
   onBuy?: () => void
@@ -162,6 +171,7 @@ function ShopCard({
   description,
   price,
   badge,
+  buyLabel,
   disabled,
   disabledLabel,
   onBuy,
@@ -187,7 +197,7 @@ function ShopCard({
             : 'w-full bg-amber-500 hover:bg-amber-400 active:scale-95 transition py-3 rounded-xl text-base font-semibold text-slate-900'
         }
       >
-        {disabled ? (disabledLabel ?? 'Coming soon') : `Buy · ${price}`}
+        {disabled ? (disabledLabel ?? 'Coming soon') : (buyLabel ?? `Buy · ${price}`)}
       </button>
     </div>
   )

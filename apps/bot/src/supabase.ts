@@ -46,6 +46,40 @@ export async function grantReplayCredit(params: {
   return { userId: row.user_id, wasNew: row.was_new };
 }
 
+// Атомарно: upsert юзера + запись в purchases + создание/продление
+// Word Pro подписки. Idempotent по telegram_payment_id. Возвращает
+// expiresAt — дату конца текущего периода (для текста сообщения юзеру).
+export async function grantProSubscription(params: {
+  telegramId: number;
+  username: string | null;
+  firstName: string | null;
+  telegramPaymentId: string;
+  starsAmount: number;
+}): Promise<{ userId: string; wasNew: boolean; expiresAt: string | null }> {
+  const { data, error } = await getSupabase().rpc('grant_pro_subscription', {
+    p_telegram_id: params.telegramId,
+    p_username: params.username,
+    p_first_name: params.firstName,
+    p_telegram_payment_id: params.telegramPaymentId,
+    p_stars_amount: params.starsAmount,
+  });
+
+  if (error) throw error;
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('grant_pro_subscription returned no row');
+  }
+  const row = data[0] as {
+    user_id: string;
+    was_new: boolean;
+    expires_at: string | null;
+  };
+  return {
+    userId: row.user_id,
+    wasNew: row.was_new,
+    expiresAt: row.expires_at,
+  };
+}
+
 // Атомарно: upsert юзера + запись в purchases + установка
 // users.double_score_date на сегодняшнюю дату. Idempotent по telegram_payment_id.
 export async function grantDoubleScore(params: {

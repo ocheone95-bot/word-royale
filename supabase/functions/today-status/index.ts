@@ -5,9 +5,11 @@
 //     ok: true,
 //     playedToday: boolean,         // есть ли non-replay сессия на сегодня
 //     replayCredits: number,        // купленных и неиспользованных
-//     freeGameAvailable: boolean,   // !playedToday — удобство для UI
-//     themes: string[],             // theme_id-шки купленных тем
+//     freeGameAvailable: boolean,   // !playedToday или Pro active — удобство для UI
+//     themes: string[],             // theme_id-шки купленных тем (для Pro — все)
 //     doubleScoreActive: boolean,   // буст ×2 куплен на сегодня и не потрачен
+//     proActive: boolean,           // активна ли Word Pro подписка
+//     proExpiresAt: string | null,  // ISO-таймстамп истечения Pro (null если нет)
 //   }
 //
 // Используется HomeScreen / ResultScreen / ShopScreen — для подсветки купленных
@@ -104,19 +106,30 @@ Deno.serve(async (req) => {
       freeGameAvailable: true,
       themes: [],
       doubleScoreActive: false,
+      proActive: false,
+      proExpiresAt: null,
     });
   }
 
-  const [{ count, error: countErr }, { data: themesRows, error: themesErr }] =
-    await Promise.all([
-      supabase
-        .from('game_sessions')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', meRow.id)
-        .eq('daily_seed', body.dailySeed)
-        .eq('was_replay', false),
-      supabase.from('user_themes').select('theme_id').eq('user_id', meRow.id),
-    ]);
+  const [
+    { count, error: countErr },
+    { data: themesRows, error: themesErr },
+    { data: proRow, error: proErr },
+  ] = await Promise.all([
+    supabase
+      .from('game_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', meRow.id)
+      .eq('daily_seed', body.dailySeed)
+      .eq('was_replay', false),
+    supabase.from('user_themes').select('theme_id').eq('user_id', meRow.id),
+    supabase
+      .from('subscriptions')
+      .select('expires_at, status')
+      .eq('user_id', meRow.id)
+      .eq('tier', 'pro')
+      .maybeSingle(),
+  ]);
   if (countErr) {
     return jsonResponse(500, {
       ok: false,
@@ -131,18 +144,45 @@ Deno.serve(async (req) => {
       detail: themesErr.message,
     });
   }
+  if (proErr) {
+    return jsonResponse(500, {
+      ok: false,
+      error: 'subscription_lookup_failed',
+      detail: proErr.message,
+    });
+  }
 
   const playedToday = (count ?? 0) > 0;
-  const themes = (themesRows ?? []).map((r) => r.theme_id as string);
+  const ownedThemes = (themesRows ?? []).map((r) => r.theme_id as string);
   const doubleScoreActive =
     typeof meRow.double_score_date === 'string' &&
     meRow.double_score_date === body.dailySeed;
+
+  const proExpiresAt =
+    proRow && typeof proRow.expires_at === 'string'
+      ? proRow.expires_at
+      : null;
+  const proActive =
+    !!proRow &&
+    proRow.status === 'active' &&
+    proExpiresAt !== null &&
+    new Date(proExpiresAt).getTime() > Date.now();
+
+  // Pro даёт доступ ко всем темам без отдельной покупки. UI рисует их как owned.
+  const ALL_THEMES = ['neon', 'retro', 'sakura', 'cyberpunk'];
+  const themes = proActive
+    ? Array.from(new Set([...ownedThemes, ...ALL_THEMES]))
+    : ownedThemes;
+
   return jsonResponse(200, {
     ok: true,
     playedToday,
     replayCredits: meRow.replay_credits as number,
-    freeGameAvailable: !playedToday,
+    // Pro обходит rate-limit: «доступна бесплатная игра» = !играл OR Pro active.
+    freeGameAvailable: !playedToday || proActive,
     themes,
     doubleScoreActive,
+    proActive,
+    proExpiresAt,
   });
 });

@@ -57,12 +57,19 @@ export default function HomeScreen() {
   // первый клик. Если submit-score вернёт no_replay, ResultScreen покажет ошибку.
   const playedToday = todayStatus.loaded ? todayStatus.playedToday : false
   const replayCredits = todayStatus.loaded ? todayStatus.replayCredits : 0
-  const noFreeNoCredits = playedToday && replayCredits === 0
-  const playLabel = !playedToday
-    ? 'Play'
-    : replayCredits > 0
-      ? `Play replay (${replayCredits} left)`
+  const proActive = todayStatus.loaded && todayStatus.proActive
+  const proExpiresAt = todayStatus.loaded ? todayStatus.proExpiresAt : null
+  // Pro обходит «Buy replay» — играть можно сколько угодно.
+  const noFreeNoCredits = playedToday && replayCredits === 0 && !proActive
+  const playLabel = proActive
+    ? playedToday
+      ? 'Play another'
       : 'Play'
+    : !playedToday
+      ? 'Play'
+      : replayCredits > 0
+        ? `Play replay (${replayCredits} left)`
+        : 'Play'
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex flex-col items-center justify-center px-6 text-white">
@@ -91,7 +98,15 @@ export default function HomeScreen() {
             {playLabel}
           </button>
         )}
-        {playedToday && (
+        {proActive && (
+          <p className="text-xs text-amber-300 mb-3 font-semibold">
+            ⭐ Word Pro
+            {proExpiresAt
+              ? ` · until ${new Date(proExpiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+              : ''}
+          </p>
+        )}
+        {playedToday && !proActive && (
           <p className="text-xs text-slate-400 mb-3">
             You already played today.{' '}
             {replayCredits > 0

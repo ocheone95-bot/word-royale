@@ -15,6 +15,7 @@ import {
 import { parseInvoicePayload } from './buy.js';
 import {
   grantDoubleScore,
+  grantProSubscription,
   grantReplayCredit,
   grantTheme,
 } from '../supabase.js';
@@ -94,6 +95,13 @@ export function registerPaymentHandlers(bot: Bot): void {
         wasNew = result.wasNew;
         successText =
           '✅ Payment received! *Double score* is active — your next game today will count for 2×.';
+      } else if (parsed.productId === 'pro_subscription') {
+        const result = await grantProSubscription(grantBase);
+        wasNew = result.wasNew;
+        const until = result.expiresAt
+          ? new Date(result.expiresAt).toUTCString().slice(0, 16)
+          : '30 days from now';
+        successText = `✅ Payment received! *Word Pro* active until ${until} — unlimited daily plays + all themes.`;
       } else if (isThemeProductId(parsed.productId)) {
         const themeId = themeIdFromProductId(parsed.productId);
         const product = getProduct(parsed.productId);

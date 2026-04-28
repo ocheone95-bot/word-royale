@@ -96,6 +96,8 @@ export interface TodayStatus {
   freeGameAvailable: boolean
   themes: string[]
   doubleScoreActive: boolean
+  proActive: boolean
+  proExpiresAt: string | null
 }
 
 interface TodayStatusSuccess extends TodayStatus {
@@ -145,6 +147,8 @@ export async function fetchTodayStatus(
     freeGameAvailable: Boolean(j.freeGameAvailable),
     themes: Array.isArray(j.themes) ? (j.themes as string[]) : [],
     doubleScoreActive: Boolean(j.doubleScoreActive),
+    proActive: Boolean(j.proActive),
+    proExpiresAt: typeof j.proExpiresAt === 'string' ? j.proExpiresAt : null,
   }
 }
 

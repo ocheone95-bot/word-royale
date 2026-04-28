@@ -11,7 +11,11 @@ export const THEME_IDS: readonly ThemeId[] = [
   'cyberpunk',
 ];
 
-export type ProductId = 'replay' | 'double_score' | `theme_${ThemeId}`;
+export type ProductId =
+  | 'replay'
+  | 'double_score'
+  | 'pro_subscription'
+  | `theme_${ThemeId}`;
 
 export interface Product {
   id: ProductId;
@@ -32,6 +36,12 @@ export const PRODUCTS: Record<ProductId, Product> = {
     title: 'Double score',
     description: 'Multiply the score of your next game today by 2×.',
     starsAmount: 200,
+  },
+  pro_subscription: {
+    id: 'pro_subscription',
+    title: 'Word Pro · 30 days',
+    description: 'Unlimited daily plays + all themes for one month.',
+    starsAmount: 150,
   },
   theme_neon: {
     id: 'theme_neon',

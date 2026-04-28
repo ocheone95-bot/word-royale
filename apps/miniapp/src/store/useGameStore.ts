@@ -28,6 +28,8 @@ export type TodayStatusState =
       replayCredits: number
       themes: string[]
       doubleScoreActive: boolean
+      proActive: boolean
+      proExpiresAt: string | null
     }
 
 const SELECTED_THEME_KEY = 'wr.selectedTheme'
@@ -220,6 +222,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     // а перезатирать пустым массивом нельзя, иначе ShopScreen «забудет» owned.
     const prevStatus = get().todayStatus
     const prevThemes = prevStatus.loaded ? prevStatus.themes : []
+    const prevPro = prevStatus.loaded ? prevStatus.proActive : false
+    const prevProExpires = prevStatus.loaded ? prevStatus.proExpiresAt : null
     if (result.ok) {
       set({
         submitStatus: 'success',
@@ -228,12 +232,15 @@ export const useGameStore = create<GameState>((set, get) => ({
         submitError: null,
         // На сегодня юзер уже точно играл; кредиты могли уменьшиться
         // (если это была replay-сессия). Если буст потратился — флаг тушим.
+        // Pro-статус submit-score не возвращает — сохраняем предыдущий.
         todayStatus: {
           loaded: true,
           playedToday: true,
           replayCredits: result.replayCreditsLeft,
           themes: prevThemes,
           doubleScoreActive: false,
+          proActive: prevPro,
+          proExpiresAt: prevProExpires,
         },
       })
     } else {
@@ -252,6 +259,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             replayCredits: 0,
             themes: prevThemes,
             doubleScoreActive: prevDouble,
+            proActive: prevPro,
+            proExpiresAt: prevProExpires,
           },
         })
       } else {
@@ -276,6 +285,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         replayCredits: result.replayCredits,
         themes: result.themes,
         doubleScoreActive: result.doubleScoreActive,
+        proActive: result.proActive,
+        proExpiresAt: result.proExpiresAt,
       },
     })
   },
