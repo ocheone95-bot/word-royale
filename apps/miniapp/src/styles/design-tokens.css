@@ -1,0 +1,74 @@
+/* ============================================================
+   WORD ROYALE — Design tokens (Phase A, sessions 10+).
+   Source: handoff "Saloon-at-night" by Claude Design.
+   These tokens live alongside the legacy --tile-* variables in
+   index.css for now — Phase C переключит экраны на новую палитру.
+   ============================================================ */
+
+:root {
+  /* --- Surface tones (warm dark, never cold) --- */
+  --bg-room: #1a1108;
+  --bg-table: #2d1f12;
+  --bg-leather: #3a2818;
+  --bg-leather-hi: #4a341f;
+  --bg-grain: #25190d;
+
+  /* --- Ink (text) --- */
+  --text-parchment: #f4e4bc;
+  --text-parchment-dim: #c9b48a;
+  --text-ash: #8a7553;
+  --text-charcoal: #1a1108;
+
+  /* --- Accents — ONE bold hue (amber-orange) + brass support --- */
+  --accent-lamp: #ff8c42;
+  --accent-lamp-hi: #ffa75e;
+  --accent-lamp-lo: #d56a26;
+  --accent-brass: #d4a849;
+  --accent-brass-hi: #e8c062;
+  --glow-pixel: #ffb84d;
+
+  /* --- States --- */
+  --ember-warn: #9a3f1c;
+  --ember-warn-hi: #b8552c;
+
+  /* --- Pixel-glow effect tokens --- */
+  --glow-sm: 0 0 4px var(--glow-pixel), 0 0 8px rgba(255, 184, 77, 0.45);
+  --glow-md: 0 0 6px var(--glow-pixel), 0 0 14px rgba(255, 184, 77, 0.55),
+    0 0 24px rgba(255, 140, 66, 0.25);
+  --glow-lg: 0 0 8px var(--glow-pixel), 0 0 18px rgba(255, 184, 77, 0.6),
+    0 0 36px rgba(255, 140, 66, 0.35);
+  --glow-brass: 0 0 6px #e8c062, 0 0 14px rgba(212, 168, 73, 0.5);
+
+  /* --- Rhythm --- */
+  --r-tile: 4px;
+  --r-card: 8px;
+  --r-pill: 999px;
+
+  /* --- Type families (Google Fonts loaded в index.html) --- */
+  --font-display: "Bagel Fat One", "Cooper Black", Georgia, serif;
+  --font-ui: "Nunito", "DM Sans", system-ui, sans-serif;
+  --font-pixel: "Pixelify Sans", "Press Start 2P", monospace;
+}
+
+/* CRT scanline overlay — применяется per-screen, не глобально.
+   Использование: <div class="scanlines"></div> поверх контейнера. */
+.scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.1) 2px,
+    rgba(0, 0, 0, 0.1) 3px
+  );
+  mix-blend-mode: multiply;
+  z-index: 5;
+}
+
+/* Pixel-perfect rendering для масштабированных pixel-sprites */
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
