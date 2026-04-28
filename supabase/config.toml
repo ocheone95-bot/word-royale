@@ -297,3 +297,7 @@ verify_jwt = false
 [functions.record-ad-reward]
 # Та же история, что и у submit-score.
 verify_jwt = false
+
+[functions.me-stats]
+# Та же история, что и у submit-score.
+verify_jwt = false

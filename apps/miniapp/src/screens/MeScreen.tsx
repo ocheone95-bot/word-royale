@@ -1,13 +1,17 @@
-// Профиль игрока. Показывает текущий статус юзера на сегодня:
-// played/replay credits, double score boost, Pro-подписка, темы, реклама.
-// Источник данных — todayStatus из useGameStore (refresh при mount/visibility).
-// Lifetime stats (best score, total games) — отложены до отдельной Edge Function.
+// Профиль игрока. Показывает текущий статус юзера на сегодня
+// (replay credits, double score boost, Pro-подписка, темы, реклама)
+// и lifetime stats (best score, total games, streak, longest word).
+// Источники данных:
+//   - todayStatus из useGameStore (refresh при mount/visibility) — для блока Today
+//   - fetchMeStats Edge Function — для блока All-time, лениво, при mount.
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRawInitData } from '@telegram-apps/sdk-react'
 import { useGameStore } from '../store/useGameStore'
 import { useTelegramUser } from '../hooks/useTelegramUser'
 import { hapticImpact } from '../lib/haptics'
+import { fetchMeStats, type MeStats } from '../lib/api'
+import { captureMessage } from '../lib/sentry'
 import { Mostaccio } from '../components/Mostaccio'
 import {
   Card,
@@ -39,6 +43,9 @@ export default function MeScreen() {
   const showShop = useGameStore((s) => s.showShop)
   const todayStatus = useGameStore((s) => s.todayStatus)
   const refreshTodayStatus = useGameStore((s) => s.refreshTodayStatus)
+  const [statsState, setStatsState] = useState<
+    { kind: 'loading' } | { kind: 'loaded'; stats: MeStats } | { kind: 'error' }
+  >({ kind: 'loading' })
 
   useEffect(() => {
     if (!initData) return
@@ -51,6 +58,36 @@ export default function MeScreen() {
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [initData, refreshTodayStatus])
+
+  useEffect(() => {
+    if (!initData) return
+    let cancelled = false
+    setStatsState({ kind: 'loading' })
+    void fetchMeStats(initData).then((res) => {
+      if (cancelled) return
+      if (res.ok) {
+        setStatsState({
+          kind: 'loaded',
+          stats: {
+            bestScore: res.bestScore,
+            totalGames: res.totalGames,
+            daysPlayed: res.daysPlayed,
+            currentStreak: res.currentStreak,
+            totalWordsFound: res.totalWordsFound,
+            longestWord: res.longestWord,
+          },
+        })
+      } else {
+        if (!res.error.startsWith('network')) {
+          captureMessage('me-stats failed', { error: res.error })
+        }
+        setStatsState({ kind: 'error' })
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [initData])
 
   const playedToday = todayStatus.loaded && todayStatus.playedToday
   const replayCredits = todayStatus.loaded ? todayStatus.replayCredits : 0
@@ -234,6 +271,79 @@ export default function MeScreen() {
         />
       </Card>
 
+      <SectionTitle>All-time</SectionTitle>
+      <Card surface="table" padding={4}>
+        {statsState.kind === 'loading' && (
+          <p
+            style={{
+              padding: '14px 12px',
+              fontSize: 12,
+              textAlign: 'center',
+              color: 'var(--text-parchment-dim)',
+            }}
+          >
+            Loading…
+          </p>
+        )}
+        {statsState.kind === 'error' && (
+          <p
+            style={{
+              padding: '14px 12px',
+              fontSize: 12,
+              textAlign: 'center',
+              color: 'var(--text-ash)',
+            }}
+          >
+            Could not load stats.
+          </p>
+        )}
+        {statsState.kind === 'loaded' && (
+          <>
+            <StatRow
+              label="Best score"
+              value={statsState.stats.bestScore.toLocaleString()}
+              highlight={statsState.stats.bestScore > 0}
+            />
+            <StatRow
+              label="Games played"
+              value={String(statsState.stats.totalGames)}
+            />
+            <StatRow
+              label="Days played"
+              value={String(statsState.stats.daysPlayed)}
+            />
+            <StatRow
+              label="Current streak"
+              value={
+                statsState.stats.currentStreak === 0
+                  ? '—'
+                  : `${statsState.stats.currentStreak} day${
+                      statsState.stats.currentStreak === 1 ? '' : 's'
+                    }`
+              }
+              highlight={statsState.stats.currentStreak >= 2}
+            />
+            <StatRow
+              label="Words found"
+              value={statsState.stats.totalWordsFound.toLocaleString()}
+            />
+            <StatRow
+              label="Longest word"
+              value={
+                statsState.stats.longestWord
+                  ? statsState.stats.longestWord.toUpperCase()
+                  : '—'
+              }
+              highlight={
+                !!statsState.stats.longestWord &&
+                statsState.stats.longestWord.length >= 5
+              }
+              divider={false}
+            />
+          </>
+        )}
+      </Card>
+
       <div
         style={{
           display: 'flex',
@@ -258,21 +368,6 @@ export default function MeScreen() {
           Leaderboard
         </SaloonButton>
       </div>
-
-      <p
-        style={{
-          fontFamily: 'var(--font-pixel)',
-          fontSize: 9,
-          color: 'var(--text-ash)',
-          textAlign: 'center',
-          letterSpacing: 1.5,
-          textTransform: 'uppercase',
-          marginTop: 18,
-          opacity: 0.6,
-        }}
-      >
-        Lifetime stats coming soon
-      </p>
 
       <div
         style={{

@@ -156,6 +156,62 @@ export async function fetchTodayStatus(
   }
 }
 
+export interface MeStats {
+  bestScore: number
+  totalGames: number
+  daysPlayed: number
+  currentStreak: number
+  totalWordsFound: number
+  longestWord: string | null
+}
+
+interface MeStatsSuccess extends MeStats {
+  ok: true
+}
+interface MeStatsFailure {
+  ok: false
+  error: string
+}
+export type MeStatsResult = MeStatsSuccess | MeStatsFailure
+
+export async function fetchMeStats(initData: string): Promise<MeStatsResult> {
+  const url = functionUrl('me-stats')
+  const headers = functionHeaders()
+  if (!url || !headers) return { ok: false, error: 'env_missing' }
+
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ initData }),
+    })
+  } catch (e) {
+    return { ok: false, error: 'network' + (e ? `:${String(e)}` : '') }
+  }
+
+  let json: unknown
+  try {
+    json = await res.json()
+  } catch {
+    return { ok: false, error: 'bad_response' }
+  }
+
+  const j = (json ?? {}) as Record<string, unknown>
+  if (!res.ok || j.ok !== true) {
+    return { ok: false, error: (j.error as string) ?? 'http_error' }
+  }
+  return {
+    ok: true,
+    bestScore: Number(j.bestScore ?? 0),
+    totalGames: Number(j.totalGames ?? 0),
+    daysPlayed: Number(j.daysPlayed ?? 0),
+    currentStreak: Number(j.currentStreak ?? 0),
+    totalWordsFound: Number(j.totalWordsFound ?? 0),
+    longestWord: typeof j.longestWord === 'string' ? j.longestWord : null,
+  }
+}
+
 interface RecordAdRewardSuccess {
   ok: true
   allowed: boolean
