@@ -17,6 +17,7 @@ import { openTelegramLink } from '../lib/telegram'
 import { isMonetagAvailable } from '../lib/monetag'
 import { track } from '../lib/analytics'
 import { hapticImpact } from '../lib/haptics'
+import { dayNumberSinceLaunch } from '../lib/day-number'
 import { useTickUp } from '../hooks/useTickUp'
 import { Mostaccio } from '../components/Mostaccio'
 import { Card, SaloonButton, Scanlines } from '../components/saloon'
@@ -137,6 +138,7 @@ export default function ResultScreen() {
       score: displayScore,
       wordsCount: foundWords.length,
       longest: longest || null,
+      dayNumber: dayNumberSinceLaunch(seed),
     })
     const url = buildPlayDeepLink(tgUser?.id ?? null)
     openTelegramLink(buildTelegramShareLink(text, url))

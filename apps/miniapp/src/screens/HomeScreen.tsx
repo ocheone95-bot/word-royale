@@ -18,6 +18,7 @@ import { openTelegramLink } from '../lib/telegram'
 import { track } from '../lib/analytics'
 import { hapticImpact } from '../lib/haptics'
 import { isSoundEnabled, setSoundEnabled } from '../lib/sounds'
+import { dayNumberSinceLaunch } from '../lib/day-number'
 import { Mostaccio } from '../components/Mostaccio'
 import { PixelLogo } from '../components/PixelLogo'
 import {
@@ -31,17 +32,6 @@ import {
 } from '../components/saloon'
 
 const REPLAY_PRICE_STARS = 50
-
-// Day-counter от запуска проекта. Используется как «Day 184» на handoff —
-// у нас день растёт от LAUNCH_DATE. Если PM захочет flavour-имена пазлов
-// («The Saloon», «The Diner»), их можно мапить по dayNumber % poolSize.
-const LAUNCH_DATE = '2026-04-26'
-
-function dayNumberSinceLaunch(seed: string): number {
-  const launch = new Date(LAUNCH_DATE + 'T00:00:00Z').getTime()
-  const today = new Date(seed + 'T00:00:00Z').getTime()
-  return Math.max(1, Math.round((today - launch) / 86_400_000) + 1)
-}
 
 function weekdayLabel(seed: string): string {
   const d = new Date(seed + 'T00:00:00Z')

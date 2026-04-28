@@ -12,6 +12,9 @@ import { useTelegramUser } from '../hooks/useTelegramUser'
 import { hapticImpact } from '../lib/haptics'
 import { fetchMeStats, type MeStats } from '../lib/api'
 import { captureMessage } from '../lib/sentry'
+import { buildFeedbackDeepLink } from '../lib/feedback'
+import { openTelegramLink } from '../lib/telegram'
+import { track } from '../lib/analytics'
 import { Mostaccio } from '../components/Mostaccio'
 import {
   Card,
@@ -110,6 +113,11 @@ export default function MeScreen() {
   const handleOpenLeaderboard = () => {
     hapticImpact('light')
     showLeaderboard()
+  }
+  const handleSendFeedback = () => {
+    hapticImpact('light')
+    track('feedback_clicked')
+    openTelegramLink(buildFeedbackDeepLink())
   }
   const handleTabChange = (key: TabKey) => {
     if (key === 'me') return
@@ -366,6 +374,17 @@ export default function MeScreen() {
           style={{ flex: 1 }}
         >
           Leaderboard
+        </SaloonButton>
+      </div>
+
+      <div style={{ marginTop: 10, display: 'flex' }}>
+        <SaloonButton
+          variant="ghost"
+          size="sm"
+          fullWidth
+          onClick={handleSendFeedback}
+        >
+          Send feedback
         </SaloonButton>
       </div>
 

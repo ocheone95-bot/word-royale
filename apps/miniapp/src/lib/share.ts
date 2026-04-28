@@ -11,19 +11,40 @@ export interface ShareTextInput {
   score: number
   wordsCount: number
   longest?: string | null
+  dayNumber?: number | null
+}
+
+// Иконка-аксель в зависимости от уровня результата.
+// Saloon-vibe: 🃏 — обычный заход, 🏆 — крепкий ран, 👑 — чемпион.
+function trophyForScore(score: number): string {
+  if (score >= 3000) return '👑'
+  if (score >= 1500) return '🏆'
+  return '🃏'
+}
+
+function formatScore(n: number): string {
+  return n.toLocaleString('en-US')
 }
 
 export function buildShareText(input: ShareTextInput): string {
-  const lines: string[] = [`Word Royale · ${input.seed}`]
-  lines.push(`🟪🟪🟪🟪🟪🟪🟪 → ${input.score}`)
-  lines.push(
-    input.wordsCount === 1
-      ? '1 word found'
-      : `${input.wordsCount} words found`,
-  )
+  const trophy = trophyForScore(input.score)
+  const day =
+    typeof input.dayNumber === 'number' && input.dayNumber > 0
+      ? `Day ${input.dayNumber}`
+      : input.seed
+  const lines: string[] = []
+  lines.push(`${trophy} Word Royale · ${day}`)
+  // Wordle-стиль блок: 7 квадратов в saloon-палитре (orange lamp).
+  lines.push(`🟧🟧🟧🟧🟧🟧🟧 → ${formatScore(input.score)}`)
+  const wordsLine =
+    input.wordsCount === 1 ? '1 word found' : `${input.wordsCount} words found`
   if (input.longest && input.longest.length >= 5) {
-    lines.push(`🏆 ${input.longest.toUpperCase()}`)
+    lines.push(`${wordsLine} · longest: ${input.longest.toUpperCase()}`)
+  } else {
+    lines.push(wordsLine)
   }
+  lines.push('')
+  lines.push('Play today’s puzzle ↓')
   return lines.join('\n')
 }
 
@@ -56,8 +77,9 @@ export function buildTelegramShareLink(text: string, url: string): string {
 // Текст для кнопки Invite на HomeScreen (нет ещё результата, нечего хвастаться).
 export function buildInviteText(): string {
   return [
-    'Word Royale — daily 90-second word puzzle.',
-    'Same letters for everyone in the world. Play with me:',
+    '🃏 Word Royale',
+    'Daily 90-second word puzzle.',
+    'Same 7 letters for everyone in the world — pick your moment, play with me ↓',
   ].join('\n')
 }
 
