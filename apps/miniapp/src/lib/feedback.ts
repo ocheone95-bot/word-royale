@@ -3,7 +3,7 @@
 // Если PM решит сменить адресата (или собрать feedback в отдельный канал/группу) —
 // меняем единственную константу FEEDBACK_USERNAME ниже.
 
-const FEEDBACK_USERNAME = 'ocheone95'
+const FEEDBACK_USERNAME = 'mnkdmt'
 
 const FEEDBACK_PREFILL =
   'Word Royale feedback: '

@@ -4,7 +4,6 @@
 
 import { useEffect, useState } from 'react'
 import { useRawInitData } from '@telegram-apps/sdk-react'
-import { getTodaySeed } from '@word-royale/shared'
 import {
   fetchDailyLeaderboard,
   fetchFriendsLeaderboard,
@@ -19,6 +18,7 @@ import {
 } from '../lib/share'
 import { openTelegramLink } from '../lib/telegram'
 import { hapticImpact } from '../lib/haptics'
+import { useDayRollover } from '../hooks/useDayRollover'
 import { Card, SaloonButton, TabBar, type TabKey } from '../components/saloon'
 
 type Mode = 'friends' | 'global'
@@ -39,13 +39,14 @@ export default function LeaderboardScreen() {
   const goHome = useGameStore((s) => s.goHome)
   const showShop = useGameStore((s) => s.showShop)
   const showMe = useGameStore((s) => s.showMe)
+  const seed = useGameStore((s) => s.seed)
   const tgUser = useTelegramUser()
   const initData = useRawInitData()
   const [mode, setMode] = useState<Mode>('friends')
   const [globalState, setGlobalState] = useState<LoadState>({ kind: 'loading' })
   const [friendsState, setFriendsState] = useState<LoadState>({ kind: 'loading' })
 
-  const seed = getTodaySeed()
+  useDayRollover(initData ?? undefined)
 
   useEffect(() => {
     let cancelled = false

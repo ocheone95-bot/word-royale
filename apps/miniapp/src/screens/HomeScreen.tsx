@@ -19,7 +19,9 @@ import { track } from '../lib/analytics'
 import { hapticImpact } from '../lib/haptics'
 import { isSoundEnabled, setSoundEnabled } from '../lib/sounds'
 import { dayNumberSinceLaunch } from '../lib/day-number'
+import { isMonetagAvailable } from '../lib/monetag'
 import { useViewportWidth } from '../hooks/useViewportWidth'
+import { useDayRollover } from '../hooks/useDayRollover'
 import { Mostaccio } from '../components/Mostaccio'
 import { PixelLogo } from '../components/PixelLogo'
 import {
@@ -70,9 +72,12 @@ export default function HomeScreen() {
   const showMe = useGameStore((s) => s.showMe)
   const todayStatus = useGameStore((s) => s.todayStatus)
   const refreshTodayStatus = useGameStore((s) => s.refreshTodayStatus)
+  const watchRewardedAd = useGameStore((s) => s.watchRewardedAd)
   const seed = useGameStore((s) => s.seed)
   const letters = useGameStore((s) => s.letters)
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled())
+  const [adInProgress, setAdInProgress] = useState(false)
+  const [adError, setAdError] = useState<string | null>(null)
   const timeLeft = useTimeUntilMidnightUTC()
   const viewportWidth = useViewportWidth()
   // ROYALE — самое широкое слово, 6 букв × (7px + 1 gap) - 1 = 47px при scale=1.
@@ -83,19 +88,20 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!initData) return
     void refreshTodayStatus(initData)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        void refreshTodayStatus(initData)
-      }
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [initData, refreshTodayStatus])
+  useDayRollover(initData ?? undefined)
 
   const playedToday = todayStatus.loaded ? todayStatus.playedToday : false
   const replayCredits = todayStatus.loaded ? todayStatus.replayCredits : 0
   const proActive = todayStatus.loaded && todayStatus.proActive
+  const adsWatchedToday = todayStatus.loaded ? todayStatus.adsWatchedToday : 0
+  const adsMaxPerDay = todayStatus.loaded ? todayStatus.adsMaxPerDay : 0
   const noFreeNoCredits = playedToday && replayCredits === 0 && !proActive
+  const adReplayAvailable =
+    noFreeNoCredits &&
+    isMonetagAvailable() &&
+    adsMaxPerDay > 0 &&
+    adsWatchedToday < adsMaxPerDay
   const playLabel = proActive
     ? playedToday
       ? '▶ Play another'
@@ -118,6 +124,21 @@ export default function HomeScreen() {
       source: 'home',
     })
     openTelegramLink(buildBuyReplayDeepLink())
+  }
+  const handleWatchAd = async () => {
+    if (!initData || adInProgress) return
+    hapticImpact('light')
+    setAdInProgress(true)
+    setAdError(null)
+    const res = await watchRewardedAd(initData)
+    setAdInProgress(false)
+    if (!res.ok) {
+      setAdError(
+        res.reason === 'limit'
+          ? 'Daily ad limit reached.'
+          : 'Ad not available right now.',
+      )
+    }
   }
   const handleInvite = () => {
     hapticImpact('light')
@@ -268,14 +289,29 @@ export default function HomeScreen() {
         </div>
 
         {noFreeNoCredits ? (
-          <SaloonButton
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={handleBuyReplay}
-          >
-            Buy replay · {REPLAY_PRICE_STARS} ⭐
-          </SaloonButton>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <SaloonButton
+              variant="primary"
+              size="lg"
+              fullWidth
+              onClick={handleBuyReplay}
+            >
+              Buy replay · {REPLAY_PRICE_STARS} ⭐
+            </SaloonButton>
+            {adReplayAvailable && (
+              <SaloonButton
+                variant="secondary"
+                size="sm"
+                fullWidth
+                onClick={handleWatchAd}
+                disabled={adInProgress}
+              >
+                {adInProgress
+                  ? 'Loading ad…'
+                  : `Watch ad → free replay (${adsMaxPerDay - adsWatchedToday} left)`}
+              </SaloonButton>
+            )}
+          </div>
         ) : (
           <SaloonButton variant="primary" size="lg" fullWidth onClick={handlePlay}>
             {playLabel}
@@ -283,7 +319,20 @@ export default function HomeScreen() {
         )}
       </Card>
 
-      {playedToday && !proActive && (
+      {adError && (
+        <p
+          style={{
+            fontSize: 11,
+            color: '#ff5a3d',
+            marginTop: 10,
+            textAlign: 'center',
+          }}
+        >
+          {adError}
+        </p>
+      )}
+
+      {playedToday && !proActive && !adError && (
         <p
           style={{
             fontSize: 11,
@@ -295,7 +344,7 @@ export default function HomeScreen() {
           You already played today.{' '}
           {replayCredits > 0
             ? `${replayCredits} replay${replayCredits === 1 ? '' : 's'} ready.`
-            : 'Buy a replay to play again.'}
+            : 'Buy a replay or watch an ad to play again.'}
         </p>
       )}
 

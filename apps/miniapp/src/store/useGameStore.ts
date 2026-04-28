@@ -108,6 +108,10 @@ interface GameState {
   showLeaderboard: () => void
   showShop: () => void
   showMe: () => void
+  // Если UTC-день сменился — обновляет seed/letters в store и сбрасывает
+  // todayStatus, чтобы UI запросил статус для нового дня. Возвращает true,
+  // если сменилось. Клиенты должны звать refreshTodayStatus() после true.
+  rolloverDayIfNeeded: () => boolean
   startGame: () => void
   setSelectedTheme: (theme: ThemeId) => void
   // Запускает Monetag rewarded-ad → +1 replay_credit при success.
@@ -152,6 +156,18 @@ export const useGameStore = create<GameState>((set, get) => ({
   showShop: () => set({ screen: 'shop' }),
 
   showMe: () => set({ screen: 'me' }),
+
+  rolloverDayIfNeeded: () => {
+    const newSeed = getTodaySeed()
+    const currentSeed = get().seed
+    if (newSeed === currentSeed) return false
+    set({
+      seed: newSeed,
+      letters: getDailyLetters(newSeed),
+      todayStatus: { loaded: false },
+    })
+    return true
+  },
 
   setSelectedTheme: (theme) => {
     applyThemeToDom(theme)

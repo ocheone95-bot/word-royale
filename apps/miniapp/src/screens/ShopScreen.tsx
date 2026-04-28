@@ -17,6 +17,7 @@ import {
 import { openTelegramLink } from '../lib/telegram'
 import { track } from '../lib/analytics'
 import { hapticImpact } from '../lib/haptics'
+import { useDayRollover } from '../hooks/useDayRollover'
 import { Mostaccio } from '../components/Mostaccio'
 import {
   Card,
@@ -139,14 +140,8 @@ export default function ShopScreen() {
   useEffect(() => {
     if (!initData) return
     void refreshTodayStatus(initData)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        void refreshTodayStatus(initData)
-      }
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [initData, refreshTodayStatus])
+  useDayRollover(initData ?? undefined)
 
   const replayCredits = todayStatus.loaded ? todayStatus.replayCredits : 0
   const ownedThemes = todayStatus.loaded ? todayStatus.themes : []

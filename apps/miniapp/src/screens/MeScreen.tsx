@@ -10,6 +10,7 @@ import { useRawInitData } from '@telegram-apps/sdk-react'
 import { useGameStore } from '../store/useGameStore'
 import { useTelegramUser } from '../hooks/useTelegramUser'
 import { hapticImpact } from '../lib/haptics'
+import { useDayRollover } from '../hooks/useDayRollover'
 import { fetchMeStats, type MeStats } from '../lib/api'
 import { captureMessage } from '../lib/sentry'
 import { buildFeedbackDeepLink } from '../lib/feedback'
@@ -53,14 +54,8 @@ export default function MeScreen() {
   useEffect(() => {
     if (!initData) return
     void refreshTodayStatus(initData)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        void refreshTodayStatus(initData)
-      }
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [initData, refreshTodayStatus])
+  useDayRollover(initData ?? undefined)
 
   useEffect(() => {
     if (!initData) return
