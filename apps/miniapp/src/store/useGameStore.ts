@@ -15,6 +15,7 @@ import { showRewardedAd } from '../lib/monetag'
 import { track } from '../lib/analytics'
 import { captureMessage } from '../lib/sentry'
 import { hapticImpact, hapticNotify, hapticSelection } from '../lib/haptics'
+import { playSfx } from '../lib/sounds'
 
 export type Screen = 'home' | 'game' | 'result' | 'leaderboard' | 'shop'
 export type Feedback = null | 'success' | 'invalid' | 'duplicate' | 'too-short'
@@ -180,6 +181,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { selectedIndices, letters } = get()
     if (index < 0 || index >= letters.length) return
     hapticSelection()
+    playSfx('tap')
     const at = selectedIndices.indexOf(index)
     if (at === -1) {
       set({ selectedIndices: [...selectedIndices, index], feedback: null })
@@ -197,21 +199,25 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (word.length < MIN_WORD_LENGTH) {
       hapticNotify('warning')
+      playSfx('fail')
       set({ feedback: 'too-short', selectedIndices: [] })
       return
     }
     if (foundWords.includes(word)) {
       hapticNotify('warning')
+      playSfx('fail')
       set({ feedback: 'duplicate', selectedIndices: [] })
       return
     }
     if (!dict.has(word)) {
       hapticNotify('error')
+      playSfx('fail')
       set({ feedback: 'invalid', selectedIndices: [] })
       return
     }
     const wordScore = calculateScore(word)
     hapticNotify('success')
+    playSfx('success')
     track('word_found', { word_length: word.length, word_score: wordScore })
     set({
       foundWords: [...foundWords, word],
@@ -241,6 +247,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       })
       set({ timeLeft: 0, screen: 'result', selectedIndices: [], feedback: null })
     } else {
+      // Тиканье на последних 10 секундах — лёгкий звуковой счётчик
+      // (haptic тут не зовём, чтобы не вибрировать каждую секунду).
+      if (next <= 10) playSfx('tick')
       set({ timeLeft: next })
     }
   },

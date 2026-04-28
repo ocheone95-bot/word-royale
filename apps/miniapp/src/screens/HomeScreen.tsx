@@ -6,10 +6,11 @@
 //   - играл и есть replay-кредит → «Play replay (N left)»
 //   - играл и кредитов 0 → primary кнопка «Buy replay (50 ⭐)», deep-link в бот.
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRawInitData } from '@telegram-apps/sdk-react'
 import { useTelegramUser } from '../hooks/useTelegramUser'
 import { useGameStore } from '../store/useGameStore'
+import { isSoundEnabled, setSoundEnabled } from '../lib/sounds'
 import {
   buildBuyReplayDeepLink,
   buildInviteText,
@@ -46,9 +47,19 @@ export default function HomeScreen() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [initData, refreshTodayStatus])
 
+  const [soundOn, setSoundOn] = useState(() => isSoundEnabled())
+
   const handlePlay = () => {
     hapticImpact('medium')
     startGame()
+  }
+
+  const handleToggleSound = () => {
+    const next = !soundOn
+    setSoundEnabled(next)
+    setSoundOn(next)
+    hapticImpact('light')
+    track('sound_toggled', { enabled: next })
   }
 
   const handleInvite = () => {
@@ -159,6 +170,14 @@ export default function HomeScreen() {
           className="w-full text-purple-300 active:scale-95 transition py-2 rounded-2xl text-sm"
         >
           📤 Invite friends
+        </button>
+        <button
+          type="button"
+          onClick={handleToggleSound}
+          className="w-full text-slate-500 active:scale-95 transition py-2 rounded-2xl text-xs"
+          aria-pressed={soundOn}
+        >
+          {soundOn ? '🔊 Sound on' : '🔇 Sound off'}
         </button>
       </div>
     </main>
