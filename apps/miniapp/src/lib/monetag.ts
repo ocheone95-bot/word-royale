@@ -1,8 +1,8 @@
 // Monetag rewarded ads — обёртка SDK.
 //
-// Monetag для TMA подгружает скрипт `https://libtl.com/sdk.js?zone=<zoneId>`,
-// который вешает на window глобал `show_<zoneId>(): Promise<void>`. Promise
-// resolves когда юзер досмотрел рекламу до конца, rejects при abort.
+// Monetag для TMA подгружает скрипт `https://libtl.com/sdk.js` с атрибутами
+// `data-zone` и `data-sdk`; SDK сам вешает на window глобал `show_<zoneId>()`,
+// который возвращает Promise (resolves при полном просмотре, rejects при abort).
 //
 // Чтобы не падать без ZONE_ID (env пустой → реклама выключена), все функции
 // деградируют тихо: `isMonetagAvailable()` возвращает false и ничего не грузит.
@@ -23,7 +23,9 @@ function loadScript(): Promise<void> {
 
   scriptLoading = new Promise((resolve, reject) => {
     const script = document.createElement('script')
-    script.src = `https://libtl.com/sdk.js?zone=${ZONE_ID}`
+    script.src = 'https://libtl.com/sdk.js'
+    script.setAttribute('data-zone', ZONE_ID)
+    script.setAttribute('data-sdk', `show_${ZONE_ID}`)
     script.async = true
     script.onload = () => {
       scriptLoaded = true
