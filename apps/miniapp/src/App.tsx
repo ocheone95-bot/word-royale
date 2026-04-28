@@ -13,25 +13,10 @@ import { useReferralAttribution } from './hooks/useReferralAttribution'
 import { useTelegramUser } from './hooks/useTelegramUser'
 import { identifyUser } from './lib/analytics'
 import { captureError, setSentryUser } from './lib/sentry'
-
-const ONBOARDING_DONE_KEY = 'wr.onboarding.done.v1'
-
-function readOnboardingDone(): boolean {
-  try {
-    return localStorage.getItem(ONBOARDING_DONE_KEY) === '1'
-  } catch {
-    // localStorage недоступен → считаем что показали (не блокируем юзера).
-    return true
-  }
-}
-
-function markOnboardingDone(): void {
-  try {
-    localStorage.setItem(ONBOARDING_DONE_KEY, '1')
-  } catch {
-    // Не критично — следующая сессия покажет онбординг ещё раз.
-  }
-}
+import {
+  loadOnboardingDone,
+  markOnboardingDone,
+} from './lib/onboarding-storage'
 
 type State = { hasError: boolean }
 
@@ -118,10 +103,36 @@ function AnalyticsIdentifier() {
   return null
 }
 
-export default function App() {
-  const [onboardingPending, setOnboardingPending] = useState(
-    () => !readOnboardingDone(),
+// Минимальный splash на время async-чтения CloudStorage. Цвет совпадает
+// с --bg-room чтобы переход в Home/Onboarding не флэшил белым.
+function BootSplash() {
+  return (
+    <main
+      style={{
+        minHeight: '100vh',
+        background: 'var(--bg-room)',
+      }}
+    />
   )
+}
+
+export default function App() {
+  // null — ещё не знаем (читаем CloudStorage); true — показываем
+  // онбординг; false — пропускаем. Splash виден только до резолва Promise
+  // (обычно <300ms; offline-CloudStorage отдаёт callback почти сразу).
+  const [onboardingPending, setOnboardingPending] = useState<boolean | null>(
+    null,
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    void loadOnboardingDone().then((done) => {
+      if (!cancelled) setOnboardingPending(!done)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const finishOnboarding = () => {
     markOnboardingDone()
@@ -132,7 +143,9 @@ export default function App() {
     <TelegramErrorBoundary>
       <ReferralAttributor />
       <AnalyticsIdentifier />
-      {onboardingPending ? (
+      {onboardingPending === null ? (
+        <BootSplash />
+      ) : onboardingPending ? (
         <OnboardingScreen onComplete={finishOnboarding} />
       ) : (
         <ActiveScreen />
