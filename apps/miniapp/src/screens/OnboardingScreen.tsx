@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { track } from '../lib/analytics'
+import { hapticImpact } from '../lib/haptics'
 
 interface OnboardingScreenProps {
   onComplete: (reason: 'completed' | 'skipped') => void
@@ -52,14 +53,17 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
 
   const handleNext = () => {
     if (isLast) {
+      hapticImpact('medium')
       track('onboarding_completed')
       onComplete('completed')
     } else {
+      hapticImpact('light')
       setStep((s) => s + 1)
     }
   }
 
   const handleSkip = () => {
+    hapticImpact('light')
     track('onboarding_skipped', { step })
     onComplete('skipped')
   }

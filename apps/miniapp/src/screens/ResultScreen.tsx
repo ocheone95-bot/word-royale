@@ -16,6 +16,7 @@ import {
 import { openTelegramLink } from '../lib/telegram'
 import { isMonetagAvailable } from '../lib/monetag'
 import { track } from '../lib/analytics'
+import { hapticImpact } from '../lib/haptics'
 
 const REPLAY_PRICE_STARS = 50
 
@@ -49,6 +50,18 @@ export default function ResultScreen() {
   const startGame = useGameStore((s) => s.startGame)
   const goHome = useGameStore((s) => s.goHome)
   const showLeaderboard = useGameStore((s) => s.showLeaderboard)
+  const handleStartReplay = () => {
+    hapticImpact('medium')
+    startGame()
+  }
+  const handleGoHome = () => {
+    hapticImpact('light')
+    goHome()
+  }
+  const handleShowLeaderboard = () => {
+    hapticImpact('light')
+    showLeaderboard()
+  }
   const submitStatus = useGameStore((s) => s.submitStatus)
   const submitError = useGameStore((s) => s.submitError)
   const submitCurrentSession = useGameStore((s) => s.submitCurrentSession)
@@ -91,6 +104,7 @@ export default function ResultScreen() {
     adsMaxPerDay > 0 &&
     adsWatchedToday < adsMaxPerDay
   const handleBuyReplay = () => {
+    hapticImpact('medium')
     track('iap_initiated', {
       product_id: 'replay',
       price_stars: REPLAY_PRICE_STARS,
@@ -100,6 +114,7 @@ export default function ResultScreen() {
   }
   const handleWatchAd = async () => {
     if (!initData || adInProgress) return
+    hapticImpact('light')
     setAdInProgress(true)
     setAdError(null)
     const res = await watchRewardedAd(initData)
@@ -122,6 +137,7 @@ export default function ResultScreen() {
   const canShare = submitStatus === 'success' || submitError === 'no_replay'
   const handleShare = () => {
     if (!canShare) return
+    hapticImpact('light')
     track('share_clicked', {
       score: displayScore,
       words_count: foundWords.length,
@@ -142,7 +158,7 @@ export default function ResultScreen() {
       <header className="flex items-center justify-between mb-8">
         <button
           type="button"
-          onClick={goHome}
+          onClick={handleGoHome}
           className="text-purple-300 active:scale-95 transition text-sm"
         >
           ← Home
@@ -170,8 +186,11 @@ export default function ResultScreen() {
           status={submitStatus}
           error={submitError}
           hasInitData={Boolean(initData)}
-          onRetry={() => initData && void submitCurrentSession(initData)}
-          onViewLeaderboard={showLeaderboard}
+          onRetry={() => {
+            hapticImpact('light')
+            if (initData) void submitCurrentSession(initData)
+          }}
+          onViewLeaderboard={handleShowLeaderboard}
         />
 
         {sorted.length > 0 ? (
@@ -203,7 +222,7 @@ export default function ResultScreen() {
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={goHome}
+              onClick={handleGoHome}
               className="py-3 rounded-xl border border-slate-600 text-slate-300 active:scale-95 transition"
             >
               Home
@@ -219,7 +238,7 @@ export default function ResultScreen() {
             ) : (
               <button
                 type="button"
-                onClick={startGame}
+                onClick={handleStartReplay}
                 className="py-3 rounded-xl bg-purple-600 text-white font-semibold active:scale-95 transition"
               >
                 {proActive

@@ -18,6 +18,7 @@ import {
 } from '../lib/share'
 import { openTelegramLink } from '../lib/telegram'
 import { track } from '../lib/analytics'
+import { hapticImpact } from '../lib/haptics'
 
 const REPLAY_PRICE_STARS = 50
 
@@ -45,19 +46,36 @@ export default function HomeScreen() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [initData, refreshTodayStatus])
 
+  const handlePlay = () => {
+    hapticImpact('medium')
+    startGame()
+  }
+
   const handleInvite = () => {
+    hapticImpact('light')
     track('invite_clicked')
     const url = buildPlayDeepLink(user?.id ?? null)
     openTelegramLink(buildTelegramShareLink(buildInviteText(), url))
   }
 
   const handleBuyReplay = () => {
+    hapticImpact('medium')
     track('iap_initiated', {
       product_id: 'replay',
       price_stars: REPLAY_PRICE_STARS,
       source: 'home',
     })
     openTelegramLink(buildBuyReplayDeepLink())
+  }
+
+  const handleShowLeaderboard = () => {
+    hapticImpact('light')
+    showLeaderboard()
+  }
+
+  const handleShowShop = () => {
+    hapticImpact('light')
+    showShop()
   }
 
   // По умолчанию (статус ещё не загружен) — показываем Play, чтобы не блокировать
@@ -99,7 +117,7 @@ export default function HomeScreen() {
         ) : (
           <button
             type="button"
-            onClick={startGame}
+            onClick={handlePlay}
             className="w-full bg-purple-600 hover:bg-purple-500 active:scale-95 transition py-4 rounded-2xl text-xl font-semibold shadow-lg shadow-purple-900/50 mb-3"
           >
             {playLabel}
@@ -123,14 +141,14 @@ export default function HomeScreen() {
         )}
         <button
           type="button"
-          onClick={showLeaderboard}
+          onClick={handleShowLeaderboard}
           className="w-full border border-slate-600 text-slate-200 active:scale-95 transition py-3 rounded-2xl text-base mb-3"
         >
           Leaderboard
         </button>
         <button
           type="button"
-          onClick={showShop}
+          onClick={handleShowShop}
           className="w-full border border-slate-600 text-slate-200 active:scale-95 transition py-3 rounded-2xl text-base mb-3"
         >
           🛒 Shop

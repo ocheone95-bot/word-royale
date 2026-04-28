@@ -14,6 +14,7 @@ import {
 } from '../lib/share'
 import { openTelegramLink } from '../lib/telegram'
 import { track } from '../lib/analytics'
+import { hapticImpact } from '../lib/haptics'
 
 const REPLAY_PRICE_STARS = 50
 const THEME_PRICE_STARS = 100
@@ -65,20 +66,32 @@ export default function ShopScreen() {
   const proExpiresAt = todayStatus.loaded ? todayStatus.proExpiresAt : null
 
   const handleBuyReplay = () => {
+    hapticImpact('medium')
     track('iap_initiated', { product_id: 'replay', price_stars: REPLAY_PRICE_STARS, source: 'shop' })
     openTelegramLink(buildBuyReplayDeepLink())
   }
   const handleBuyTheme = (id: ThemeId) => {
+    hapticImpact('medium')
     track('iap_initiated', { product_id: `theme_${id}`, price_stars: THEME_PRICE_STARS, source: 'shop' })
     openTelegramLink(buildBuyThemeDeepLink(id))
   }
   const handleBuyDoubleScore = () => {
+    hapticImpact('medium')
     track('iap_initiated', { product_id: 'double_score', price_stars: 200, source: 'shop' })
     openTelegramLink(buildBuyDeepLink('double_score'))
   }
   const handleBuyPro = () => {
+    hapticImpact('medium')
     track('iap_initiated', { product_id: 'pro_subscription', price_stars: 150, source: 'shop' })
     openTelegramLink(buildBuyDeepLink('pro_subscription'))
+  }
+  const handleApplyTheme = (id: ThemeId) => {
+    hapticImpact('light')
+    setSelectedTheme(id)
+  }
+  const handleGoHome = () => {
+    hapticImpact('light')
+    goHome()
   }
 
   return (
@@ -87,7 +100,7 @@ export default function ShopScreen() {
         <div className="flex items-center justify-between mb-6">
           <button
             type="button"
-            onClick={goHome}
+            onClick={handleGoHome}
             className="text-purple-300 active:scale-95 transition text-sm"
           >
             ← Back
@@ -132,7 +145,7 @@ export default function ShopScreen() {
                 theme={theme}
                 owned={theme.id === 'default' || ownedThemes.includes(theme.id)}
                 active={selectedTheme === theme.id}
-                onApply={() => setSelectedTheme(theme.id)}
+                onApply={() => handleApplyTheme(theme.id)}
                 onBuy={() => handleBuyTheme(theme.id)}
               />
             ))}

@@ -14,6 +14,7 @@ import { fetchTodayStatus, recordAdReward, submitSession } from '../lib/api'
 import { showRewardedAd } from '../lib/monetag'
 import { track } from '../lib/analytics'
 import { captureMessage } from '../lib/sentry'
+import { hapticImpact, hapticNotify, hapticSelection } from '../lib/haptics'
 
 export type Screen = 'home' | 'game' | 'result' | 'leaderboard' | 'shop'
 export type Feedback = null | 'success' | 'invalid' | 'duplicate' | 'too-short'
@@ -178,6 +179,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   toggleLetter: (index) => {
     const { selectedIndices, letters } = get()
     if (index < 0 || index >= letters.length) return
+    hapticSelection()
     const at = selectedIndices.indexOf(index)
     if (at === -1) {
       set({ selectedIndices: [...selectedIndices, index], feedback: null })
@@ -194,18 +196,22 @@ export const useGameStore = create<GameState>((set, get) => ({
     const word = selectedIndices.map((i) => letters[i]).join('')
 
     if (word.length < MIN_WORD_LENGTH) {
+      hapticNotify('warning')
       set({ feedback: 'too-short', selectedIndices: [] })
       return
     }
     if (foundWords.includes(word)) {
+      hapticNotify('warning')
       set({ feedback: 'duplicate', selectedIndices: [] })
       return
     }
     if (!dict.has(word)) {
+      hapticNotify('error')
       set({ feedback: 'invalid', selectedIndices: [] })
       return
     }
     const wordScore = calculateScore(word)
+    hapticNotify('success')
     track('word_found', { word_length: word.length, word_score: wordScore })
     set({
       foundWords: [...foundWords, word],
@@ -226,6 +232,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         (a, b) => (b.length > a.length ? b : a),
         '',
       )
+      hapticImpact('heavy')
       track('game_completed', {
         seed,
         score,

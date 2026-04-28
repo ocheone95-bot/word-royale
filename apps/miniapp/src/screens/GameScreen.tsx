@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { calculateScore } from '@word-royale/shared'
 import { useGameStore, type Feedback } from '../store/useGameStore'
 import { useDictionary } from '../hooks/useDictionary'
+import { hapticImpact } from '../lib/haptics'
 
 export default function GameScreen() {
   const { dict, error } = useDictionary()
@@ -21,6 +22,14 @@ export default function GameScreen() {
   const goHome = useGameStore((s) => s.goHome)
   const toggleLetter = useGameStore((s) => s.toggleLetter)
   const clearSelection = useGameStore((s) => s.clearSelection)
+  const handleGoHome = () => {
+    hapticImpact('light')
+    goHome()
+  }
+  const handleClear = () => {
+    hapticImpact('light')
+    clearSelection()
+  }
   const clearFeedback = useGameStore((s) => s.clearFeedback)
   const submitWord = useGameStore((s) => s.submitWord)
   const tickTimer = useGameStore((s) => s.tickTimer)
@@ -46,7 +55,7 @@ export default function GameScreen() {
       <header className="flex items-center justify-between mb-6">
         <button
           type="button"
-          onClick={goHome}
+          onClick={handleGoHome}
           className="text-purple-300 active:scale-95 transition text-sm"
         >
           ← Back
@@ -87,7 +96,7 @@ export default function GameScreen() {
           <div className="grid grid-cols-2 gap-3 max-w-sm w-full">
             <button
               type="button"
-              onClick={clearSelection}
+              onClick={handleClear}
               disabled={selectedIndices.length === 0}
               className="py-3 rounded-xl border border-slate-600 text-slate-300 active:scale-95 transition disabled:opacity-40 disabled:active:scale-100"
             >

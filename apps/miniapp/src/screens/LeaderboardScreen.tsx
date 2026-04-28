@@ -20,6 +20,7 @@ import {
   buildTelegramShareLink,
 } from '../lib/share'
 import { openTelegramLink } from '../lib/telegram'
+import { hapticImpact } from '../lib/haptics'
 
 type Mode = 'global' | 'friends'
 
@@ -75,8 +76,19 @@ export default function LeaderboardScreen() {
   const state = mode === 'global' ? globalState : friendsState
 
   const handleInvite = () => {
+    hapticImpact('light')
     const url = buildPlayDeepLink(tgUser?.id ?? null)
     openTelegramLink(buildTelegramShareLink(buildInviteText(), url))
+  }
+
+  const handleGoHome = () => {
+    hapticImpact('light')
+    goHome()
+  }
+
+  const handleSetMode = (next: Mode) => {
+    if (next !== mode) hapticImpact('light')
+    setMode(next)
   }
 
   return (
@@ -84,7 +96,7 @@ export default function LeaderboardScreen() {
       <header className="flex items-center justify-between mb-4">
         <button
           type="button"
-          onClick={goHome}
+          onClick={handleGoHome}
           className="text-purple-300 active:scale-95 transition text-sm"
         >
           ← Home
@@ -96,7 +108,7 @@ export default function LeaderboardScreen() {
       <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-800/60 border border-slate-700 mb-5 text-sm">
         <button
           type="button"
-          onClick={() => setMode('global')}
+          onClick={() => handleSetMode('global')}
           className={`py-2 rounded-lg transition ${
             mode === 'global'
               ? 'bg-purple-600 text-white'
@@ -107,7 +119,7 @@ export default function LeaderboardScreen() {
         </button>
         <button
           type="button"
-          onClick={() => setMode('friends')}
+          onClick={() => handleSetMode('friends')}
           className={`py-2 rounded-lg transition ${
             mode === 'friends'
               ? 'bg-purple-600 text-white'
