@@ -1,7 +1,7 @@
-// Экран итогов партии. Показывает финальный счёт, найденные слова, статус
-// серверной отправки и кнопки Play again / Home. После маунта сразу шлёт
-// сессию в submit-score; если что-то пошло не так — показывает причину
-// и кнопку Retry. Rate-limit «1 игра в день» подключим на Неделе 4.
+// Экран итогов партии. Saloon-redesign: trophy/blanket Mostaccio в зависимости
+// от результата, big tick-up счёт в pixel font, stats card, primary CTA
+// зависит от состояния (Share / Buy replay / Watch ad). Сохраняет всю
+// существующую логику submit-score / share / replay / ad.
 
 import { useEffect, useState } from 'react'
 import { useRawInitData } from '@telegram-apps/sdk-react'
@@ -18,6 +18,8 @@ import { isMonetagAvailable } from '../lib/monetag'
 import { track } from '../lib/analytics'
 import { hapticImpact } from '../lib/haptics'
 import { useTickUp } from '../hooks/useTickUp'
+import { Mostaccio } from '../components/Mostaccio'
+import { Card, SaloonButton, Scanlines } from '../components/saloon'
 
 const REPLAY_PRICE_STARS = 50
 
@@ -51,18 +53,6 @@ export default function ResultScreen() {
   const startGame = useGameStore((s) => s.startGame)
   const goHome = useGameStore((s) => s.goHome)
   const showLeaderboard = useGameStore((s) => s.showLeaderboard)
-  const handleStartReplay = () => {
-    hapticImpact('medium')
-    startGame()
-  }
-  const handleGoHome = () => {
-    hapticImpact('light')
-    goHome()
-  }
-  const handleShowLeaderboard = () => {
-    hapticImpact('light')
-    showLeaderboard()
-  }
   const submitStatus = useGameStore((s) => s.submitStatus)
   const submitError = useGameStore((s) => s.submitError)
   const submitCurrentSession = useGameStore((s) => s.submitCurrentSession)
@@ -80,32 +70,34 @@ export default function ResultScreen() {
     }
   }, [initData, submitStatus, submitCurrentSession])
 
-  // serverScore = клиентский score × 2, если был активен Double Score boost.
-  // До серверного ответа показываем клиентский счёт. Tick-up анимирует от 0
-  // до текущего значения; пересчитывается, если серверный ×2 апгрейдит счёт.
   const displayScore = serverScore ?? score
   const animatedScore = useTickUp(displayScore, 800)
   const longest = foundWords.reduce((a, b) => (b.length > a.length ? b : a), '')
-  const sorted = [...foundWords].sort((a, b) => b.length - a.length || a.localeCompare(b))
 
-  // После сохранения сессии: если кредитов больше нет, «Play again» меняется
-  // на «Buy replay» (deep-link в бот). До сохранения и без статуса — оставляем
-  // обычный Play again, пользовательский тап вызовет startGame и потом, при
-  // submit'е, либо спишется кредит, либо вернётся ошибка no_replay.
   const knowStatus = todayStatus.loaded
   const replayCredits = knowStatus ? todayStatus.replayCredits : null
   const proActive = knowStatus && todayStatus.proActive
   const adsWatchedToday = knowStatus ? todayStatus.adsWatchedToday : 0
   const adsMaxPerDay = knowStatus ? todayStatus.adsMaxPerDay : 0
-  // Pro обходит «Buy replay» — играть можно сколько угодно.
   const needsBuyReplay = knowStatus && replayCredits === 0 && !proActive
-  // Бесплатный replay через рекламу: SDK подключен, дневной лимит не исчерпан,
-  // и юзеру реально нужен ещё replay (нет credits, нет Pro).
   const adReplayAvailable =
     needsBuyReplay &&
     isMonetagAvailable() &&
     adsMaxPerDay > 0 &&
     adsWatchedToday < adsMaxPerDay
+
+  const handleStartReplay = () => {
+    hapticImpact('medium')
+    startGame()
+  }
+  const handleGoHome = () => {
+    hapticImpact('light')
+    goHome()
+  }
+  const handleShowLeaderboard = () => {
+    hapticImpact('medium')
+    showLeaderboard()
+  }
   const handleBuyReplay = () => {
     hapticImpact('medium')
     track('iap_initiated', {
@@ -129,14 +121,8 @@ export default function ResultScreen() {
           : 'Ad not available right now.',
       )
     }
-    // На success todayStatus.replayCredits уже обновлён в стор'е — UI ниже
-    // переключится на «Play replay» автоматически.
   }
 
-  // Share становится активным после серверного подтверждения ИЛИ в случае
-  // no_replay — счёт настоящий (юзер реально играл и набрал очки), просто
-  // rate-limit не дал сохранить второй результат за день. Запрещать шарить
-  // в этом случае было бы UX-облом без причины.
   const canShare = submitStatus === 'success' || submitError === 'no_replay'
   const handleShare = () => {
     if (!canShare) return
@@ -156,120 +142,283 @@ export default function ResultScreen() {
     openTelegramLink(buildTelegramShareLink(text, url))
   }
 
+  // Тёплая поза кота для хорошего результата, blanket для слабого.
+  const goodResult = displayScore >= 200 && foundWords.length >= 3
+  const catPose = goodResult ? 'trophy' : foundWords.length === 0 ? 'blanket' : 'proud'
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex flex-col px-6 py-8 text-white">
-      <header className="flex items-center justify-between mb-8">
+    <main
+      style={{
+        minHeight: '100vh',
+        position: 'relative',
+        background:
+          'radial-gradient(circle at 50% 25%, rgba(255,140,66,0.2) 0%, transparent 55%), var(--bg-room)',
+        color: 'var(--text-parchment)',
+        paddingInline: 18,
+        paddingTop: 14,
+        paddingBottom: 36,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <Scanlines enabled opacity={0.08} />
+
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+        }}
+      >
         <button
           type="button"
           onClick={handleGoHome}
-          className="text-purple-300 active:scale-95 transition text-sm"
+          aria-label="Close"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-parchment-dim)',
+            fontFamily: 'var(--font-pixel)',
+            fontSize: 22,
+            cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent',
+            padding: 6,
+          }}
         >
-          ← Home
+          ×
         </button>
-        <span className="text-xs text-slate-400 font-mono">{seed}</span>
-        <span className="w-12" />
       </header>
 
-      <div className="flex-1 flex flex-col items-center">
-        <p className="text-purple-300 mb-2 text-sm uppercase tracking-widest">Time's up</p>
-        <h1 className="text-7xl font-bold tracking-tight mb-1 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent tabular-nums">
-          {animatedScore}
-        </h1>
-        {doubleScoreApplied && (
-          <p className="mb-2 text-xs font-bold text-amber-400 uppercase tracking-widest">
-            ×2 boost applied
-          </p>
-        )}
-        <p className="text-slate-400 text-sm mb-6">
-          {foundWords.length} word{foundWords.length === 1 ? '' : 's'}
-          {longest ? ` · longest: ${longest.toUpperCase()}` : ''}
-        </p>
-
-        <SubmitStatusBlock
-          status={submitStatus}
-          error={submitError}
-          hasInitData={Boolean(initData)}
-          onRetry={() => {
-            hapticImpact('light')
-            if (initData) void submitCurrentSession(initData)
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
+        <span
+          style={{
+            display: 'inline-block',
+            background: 'var(--accent-lamp)',
+            color: 'var(--text-charcoal)',
+            padding: '4px 14px',
+            borderRadius: 999,
+            fontFamily: 'var(--font-pixel)',
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: 2,
+            textTransform: 'uppercase',
+            boxShadow: '0 0 16px rgba(255,140,66,0.65)',
           }}
-          onViewLeaderboard={handleShowLeaderboard}
-        />
+        >
+          Round over
+        </span>
+      </div>
 
-        {sorted.length > 0 ? (
-          <div className="w-full max-w-sm mb-10">
-            <div className="flex flex-wrap gap-2 justify-center">
-              {sorted.map((w) => (
-                <span
-                  key={w}
-                  className="px-2 py-1 rounded-md bg-slate-800/70 border border-slate-700 text-sm uppercase font-mono"
-                >
-                  {w}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <p className="text-slate-500 mb-10">No words this round.</p>
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+        <Mostaccio pose={catPose} scale={3.5} />
+      </div>
+
+      <p
+        style={{
+          fontFamily: 'var(--font-pixel)',
+          fontSize: 11,
+          color: 'var(--text-ash)',
+          letterSpacing: 2,
+          textTransform: 'uppercase',
+          marginTop: 12,
+          marginBottom: 0,
+          textAlign: 'center',
+        }}
+      >
+        Final score
+      </p>
+      <h1
+        style={{
+          fontFamily: 'var(--font-pixel)',
+          fontSize: 64,
+          fontWeight: 700,
+          color: 'var(--glow-pixel)',
+          textShadow: '0 0 8px var(--glow-pixel), 0 0 22px var(--accent-lamp)',
+          margin: '4px 0 0',
+          textAlign: 'center',
+          fontVariantNumeric: 'tabular-nums',
+          lineHeight: 1,
+        }}
+      >
+        {animatedScore.toLocaleString()}
+      </h1>
+
+      {doubleScoreApplied && (
+        <p
+          style={{
+            textAlign: 'center',
+            marginTop: 4,
+            fontSize: 10,
+            fontFamily: 'var(--font-pixel)',
+            color: 'var(--accent-brass-hi)',
+            letterSpacing: 2,
+            textTransform: 'uppercase',
+          }}
+        >
+          ×2 boost applied
+        </p>
+      )}
+
+      <Card surface="table" padding={14} style={{ marginTop: 16 }}>
+        <StatRow label="Words found" value={String(foundWords.length)} />
+        {longest && (
+          <StatRow
+            label="Best word"
+            value={longest.toUpperCase()}
+            highlight
+          />
         )}
+        <StatRow label="Longest" value={`${longest.length || 0} letters`} />
+      </Card>
 
-        <div className="flex flex-col gap-3 max-w-sm w-full mt-auto">
-          <button
-            type="button"
-            onClick={handleShare}
-            disabled={!canShare}
-            className="py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+      <SubmitStatusBlock
+        status={submitStatus}
+        error={submitError}
+        hasInitData={Boolean(initData)}
+        onRetry={() => {
+          hapticImpact('light')
+          if (initData) void submitCurrentSession(initData)
+        }}
+      />
+
+      <div
+        style={{
+          marginTop: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          paddingTop: 24,
+        }}
+      >
+        <SaloonButton
+          variant="primary"
+          size="md"
+          fullWidth
+          onClick={handleShare}
+          disabled={!canShare}
+        >
+          📤 Share result
+        </SaloonButton>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <SaloonButton
+            variant="secondary"
+            size="md"
+            onClick={handleGoHome}
+            style={{ flex: 1 }}
           >
-            📤 Share result
-          </button>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={handleGoHome}
-              className="py-3 rounded-xl border border-slate-600 text-slate-300 active:scale-95 transition"
+            Home
+          </SaloonButton>
+          {needsBuyReplay ? (
+            <SaloonButton
+              variant="primary"
+              size="md"
+              onClick={handleBuyReplay}
+              style={{ flex: 1.4 }}
             >
-              Home
-            </button>
-            {needsBuyReplay ? (
-              <button
-                type="button"
-                onClick={handleBuyReplay}
-                className="py-3 rounded-xl bg-amber-500 text-white font-semibold active:scale-95 transition"
-              >
-                Buy replay · {REPLAY_PRICE_STARS} ⭐
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleStartReplay}
-                className="py-3 rounded-xl bg-purple-600 text-white font-semibold active:scale-95 transition"
-              >
-                {proActive
-                  ? 'Play another'
-                  : replayCredits !== null && replayCredits > 0
-                    ? `Play replay (${replayCredits})`
-                    : 'Play again'}
-              </button>
-            )}
-          </div>
-          {adReplayAvailable && (
-            <button
-              type="button"
-              onClick={handleWatchAd}
-              disabled={adInProgress}
-              className="py-3 rounded-xl border border-amber-500/60 text-amber-300 font-medium active:scale-95 transition disabled:opacity-50"
+              Buy replay · {REPLAY_PRICE_STARS} ⭐
+            </SaloonButton>
+          ) : (
+            <SaloonButton
+              variant="primary"
+              size="md"
+              onClick={handleStartReplay}
+              style={{ flex: 1.4 }}
             >
-              {adInProgress
-                ? 'Loading ad…'
-                : `📺 Watch ad → free replay (${adsMaxPerDay - adsWatchedToday} left)`}
-            </button>
-          )}
-          {adError && (
-            <p className="text-xs text-rose-400 text-center">{adError}</p>
+              {proActive
+                ? 'Play another'
+                : replayCredits !== null && replayCredits > 0
+                  ? `Play replay (${replayCredits})`
+                  : 'Play again'}
+            </SaloonButton>
           )}
         </div>
+        {adReplayAvailable && (
+          <SaloonButton
+            variant="secondary"
+            size="sm"
+            fullWidth
+            onClick={handleWatchAd}
+            disabled={adInProgress}
+          >
+            {adInProgress
+              ? 'Loading ad…'
+              : `📺 Watch ad → free replay (${adsMaxPerDay - adsWatchedToday} left)`}
+          </SaloonButton>
+        )}
+        {adError && (
+          <p
+            style={{
+              fontSize: 11,
+              color: '#ff5a3d',
+              textAlign: 'center',
+            }}
+          >
+            {adError}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={handleShowLeaderboard}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--accent-brass-hi)',
+            fontFamily: 'var(--font-ui)',
+            fontSize: 13,
+            fontWeight: 700,
+            padding: '8px 12px',
+            cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent',
+            marginTop: 4,
+          }}
+        >
+          ♛ View leaderboard
+        </button>
       </div>
     </main>
+  )
+}
+
+function StatRow({
+  label,
+  value,
+  highlight = false,
+}: {
+  label: string
+  value: string
+  highlight?: boolean
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        padding: '6px 0',
+        borderBottom: '1px dashed rgba(244,228,188,0.08)',
+      }}
+    >
+      <span
+        style={{
+          fontSize: 13,
+          color: 'var(--text-parchment-dim)',
+          fontFamily: 'var(--font-ui)',
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontFamily: 'var(--font-pixel)',
+          fontSize: 14,
+          fontWeight: 700,
+          color: highlight ? 'var(--accent-lamp)' : 'var(--text-parchment)',
+          textShadow: highlight ? '0 0 8px rgba(255,140,66,0.5)' : 'none',
+          letterSpacing: highlight ? 1.5 : 0,
+        }}
+      >
+        {value}
+      </span>
+    </div>
   )
 }
 
@@ -278,7 +427,6 @@ interface SubmitStatusBlockProps {
   error: string | null
   hasInitData: boolean
   onRetry: () => void
-  onViewLeaderboard: () => void
 }
 
 function SubmitStatusBlock({
@@ -286,42 +434,76 @@ function SubmitStatusBlock({
   error,
   hasInitData,
   onRetry,
-  onViewLeaderboard,
 }: SubmitStatusBlockProps) {
   if (!hasInitData) {
     return (
-      <p className="mb-8 text-xs text-slate-500">
+      <p
+        style={{
+          marginTop: 14,
+          textAlign: 'center',
+          fontSize: 11,
+          color: 'var(--text-ash)',
+        }}
+      >
         Open in Telegram to save your score to the leaderboard.
       </p>
     )
   }
 
   if (status === 'submitting' || status === 'idle') {
-    return <p className="mb-8 text-xs text-slate-400">Saving to leaderboard…</p>
+    return (
+      <p
+        style={{
+          marginTop: 14,
+          textAlign: 'center',
+          fontSize: 11,
+          color: 'var(--text-parchment-dim)',
+        }}
+      >
+        Saving to leaderboard…
+      </p>
+    )
   }
 
   if (status === 'success') {
     return (
-      <div className="mb-8 flex flex-col items-center gap-2">
-        <p className="text-xs text-emerald-400">Saved to leaderboard ✓</p>
-        <button
-          type="button"
-          onClick={onViewLeaderboard}
-          className="text-xs text-purple-300 underline active:scale-95 transition"
-        >
-          View top 100
-        </button>
-      </div>
+      <p
+        style={{
+          marginTop: 14,
+          textAlign: 'center',
+          fontSize: 11,
+          color: 'var(--accent-brass-hi)',
+        }}
+      >
+        ✓ Saved to leaderboard
+      </p>
     )
   }
 
   return (
-    <div className="mb-8 flex flex-col items-center gap-2">
-      <p className="text-xs text-rose-400">{describeError(error)}</p>
+    <div
+      style={{
+        marginTop: 14,
+        textAlign: 'center',
+      }}
+    >
+      <p style={{ fontSize: 11, color: '#ff5a3d', margin: 0 }}>
+        {describeError(error)}
+      </p>
       <button
         type="button"
         onClick={onRetry}
-        className="text-xs text-purple-300 underline active:scale-95 transition"
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: 'var(--accent-lamp)',
+          fontSize: 11,
+          fontFamily: 'var(--font-ui)',
+          fontWeight: 700,
+          textDecoration: 'underline',
+          marginTop: 4,
+          cursor: 'pointer',
+        }}
       >
         Retry
       </button>

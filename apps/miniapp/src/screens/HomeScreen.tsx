@@ -1,16 +1,13 @@
-// Главный экран Mini App. Показывает приветствие с именем юзера из Telegram,
-// кнопки Play / Buy replay, Leaderboard и Invite friends.
+// Главный экран. Дизайн — saloon-at-night по handoff Claude Design.
+// Mostaccio proud, PixelLogo, today's puzzle card с превью букв,
+// большой Play CTA, нижний TabBar.
 //
-// Логика главной кнопки:
-//   - не играл сегодня → «Play» (бесплатная игра)
-//   - играл и есть replay-кредит → «Play replay (N left)»
-//   - играл и кредитов 0 → primary кнопка «Buy replay (50 ⭐)», deep-link в бот.
+// Логика навигации/IAP/sound — без изменений с предыдущей версии.
 
 import { useEffect, useState } from 'react'
 import { useRawInitData } from '@telegram-apps/sdk-react'
 import { useTelegramUser } from '../hooks/useTelegramUser'
 import { useGameStore } from '../store/useGameStore'
-import { isSoundEnabled, setSoundEnabled } from '../lib/sounds'
 import {
   buildBuyReplayDeepLink,
   buildInviteText,
@@ -20,8 +17,58 @@ import {
 import { openTelegramLink } from '../lib/telegram'
 import { track } from '../lib/analytics'
 import { hapticImpact } from '../lib/haptics'
+import { isSoundEnabled, setSoundEnabled } from '../lib/sounds'
+import { Mostaccio } from '../components/Mostaccio'
+import { PixelLogo } from '../components/PixelLogo'
+import {
+  Card,
+  LetterTile,
+  ProBadge,
+  SaloonButton,
+  StreakChip,
+  TabBar,
+  type TabKey,
+} from '../components/saloon'
 
 const REPLAY_PRICE_STARS = 50
+
+// Day-counter от запуска проекта. Используется как «Day 184» на handoff —
+// у нас день растёт от LAUNCH_DATE. Если PM захочет flavour-имена пазлов
+// («The Saloon», «The Diner»), их можно мапить по dayNumber % poolSize.
+const LAUNCH_DATE = '2026-04-26'
+
+function dayNumberSinceLaunch(seed: string): number {
+  const launch = new Date(LAUNCH_DATE + 'T00:00:00Z').getTime()
+  const today = new Date(seed + 'T00:00:00Z').getTime()
+  return Math.max(1, Math.round((today - launch) / 86_400_000) + 1)
+}
+
+function weekdayLabel(seed: string): string {
+  const d = new Date(seed + 'T00:00:00Z')
+  return d
+    .toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })
+    .toUpperCase()
+}
+
+function useTimeUntilMidnightUTC(): string {
+  const [label, setLabel] = useState(() => buildLabel())
+  useEffect(() => {
+    const id = setInterval(() => setLabel(buildLabel()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  return label
+}
+
+function buildLabel(): string {
+  const now = new Date()
+  const next = new Date(now)
+  next.setUTCHours(24, 0, 0, 0)
+  const ms = next.getTime() - now.getTime()
+  const totalMin = Math.max(0, Math.floor(ms / 60_000))
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  return `${h}h ${m.toString().padStart(2, '0')}m left`
+}
 
 export default function HomeScreen() {
   const user = useTelegramUser()
@@ -31,10 +78,11 @@ export default function HomeScreen() {
   const showShop = useGameStore((s) => s.showShop)
   const todayStatus = useGameStore((s) => s.todayStatus)
   const refreshTodayStatus = useGameStore((s) => s.refreshTodayStatus)
-  const greeting = user?.firstName ? `Hello, ${user.firstName}!` : 'Hello!'
+  const seed = useGameStore((s) => s.seed)
+  const letters = useGameStore((s) => s.letters)
+  const [soundOn, setSoundOn] = useState(() => isSoundEnabled())
+  const timeLeft = useTimeUntilMidnightUTC()
 
-  // Подгрузка статуса при первом маунте Home и при возврате во вкладку
-  // (после оплаты Stars в боте Mini App снова получает focus).
   useEffect(() => {
     if (!initData) return
     void refreshTodayStatus(initData)
@@ -47,28 +95,24 @@ export default function HomeScreen() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [initData, refreshTodayStatus])
 
-  const [soundOn, setSoundOn] = useState(() => isSoundEnabled())
+  const playedToday = todayStatus.loaded ? todayStatus.playedToday : false
+  const replayCredits = todayStatus.loaded ? todayStatus.replayCredits : 0
+  const proActive = todayStatus.loaded && todayStatus.proActive
+  const noFreeNoCredits = playedToday && replayCredits === 0 && !proActive
+  const playLabel = proActive
+    ? playedToday
+      ? '▶ Play another'
+      : '▶ Play'
+    : !playedToday
+      ? '▶ Play'
+      : replayCredits > 0
+        ? `▶ Play replay (${replayCredits})`
+        : '▶ Play'
 
   const handlePlay = () => {
     hapticImpact('medium')
     startGame()
   }
-
-  const handleToggleSound = () => {
-    const next = !soundOn
-    setSoundEnabled(next)
-    setSoundOn(next)
-    hapticImpact('light')
-    track('sound_toggled', { enabled: next })
-  }
-
-  const handleInvite = () => {
-    hapticImpact('light')
-    track('invite_clicked')
-    const url = buildPlayDeepLink(user?.id ?? null)
-    openTelegramLink(buildTelegramShareLink(buildInviteText(), url))
-  }
-
   const handleBuyReplay = () => {
     hapticImpact('medium')
     track('iap_initiated', {
@@ -78,107 +122,244 @@ export default function HomeScreen() {
     })
     openTelegramLink(buildBuyReplayDeepLink())
   }
-
-  const handleShowLeaderboard = () => {
+  const handleInvite = () => {
     hapticImpact('light')
-    showLeaderboard()
+    track('invite_clicked')
+    const url = buildPlayDeepLink(user?.id ?? null)
+    openTelegramLink(buildTelegramShareLink(buildInviteText(), url))
+  }
+  const handleToggleSound = () => {
+    const next = !soundOn
+    setSoundEnabled(next)
+    setSoundOn(next)
+    hapticImpact('light')
+    track('sound_toggled', { enabled: next })
+  }
+  const handleTabChange = (key: TabKey) => {
+    if (key === 'home') return
+    hapticImpact('light')
+    if (key === 'board') showLeaderboard()
+    else if (key === 'shop') showShop()
+    // 'me' — пока нет Settings/Profile экрана, no-op.
   }
 
-  const handleShowShop = () => {
-    hapticImpact('light')
-    showShop()
-  }
-
-  // По умолчанию (статус ещё не загружен) — показываем Play, чтобы не блокировать
-  // первый клик. Если submit-score вернёт no_replay, ResultScreen покажет ошибку.
-  const playedToday = todayStatus.loaded ? todayStatus.playedToday : false
-  const replayCredits = todayStatus.loaded ? todayStatus.replayCredits : 0
-  const proActive = todayStatus.loaded && todayStatus.proActive
-  const proExpiresAt = todayStatus.loaded ? todayStatus.proExpiresAt : null
-  // Pro обходит «Buy replay» — играть можно сколько угодно.
-  const noFreeNoCredits = playedToday && replayCredits === 0 && !proActive
-  const playLabel = proActive
-    ? playedToday
-      ? 'Play another'
-      : 'Play'
-    : !playedToday
-      ? 'Play'
-      : replayCredits > 0
-        ? `Play replay (${replayCredits} left)`
-        : 'Play'
+  const day = dayNumberSinceLaunch(seed)
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex flex-col items-center justify-center px-6 text-white">
-      <div className="max-w-md w-full text-center">
-        <p className="text-purple-300 mb-2 text-base">{greeting}</p>
-        <h1 className="text-5xl font-bold tracking-tight mb-3 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-          Word Royale
-        </h1>
-        <p className="text-slate-300 mb-12 text-lg">
-          Daily 90-second word puzzle. Same letters for everyone.
+    <main
+      style={{
+        minHeight: '100vh',
+        position: 'relative',
+        background:
+          'radial-gradient(circle at 50% -10%, rgba(255,140,66,0.2) 0%, transparent 45%), radial-gradient(circle at 50% 110%, rgba(0,0,0,0.5) 0%, transparent 60%), var(--bg-room)',
+        color: 'var(--text-parchment)',
+        paddingInline: 18,
+        paddingTop: 14,
+        paddingBottom: 100,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          minHeight: 28,
+        }}
+      >
+        <StreakChip days={1} />
+        {proActive ? <ProBadge /> : <span style={{ width: 1 }} />}
+      </header>
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          marginTop: 22,
+          gap: 4,
+        }}
+      >
+        <PixelLogo text="WORD" scale={5} color="#ff8c42" glow="#ff8c42" />
+        <PixelLogo
+          text="ROYALE"
+          scale={5}
+          color="#f4e4bc"
+          glow="#ff8c42"
+          glowStrength="md"
+        />
+        <p
+          style={{
+            fontFamily: 'var(--font-pixel)',
+            fontSize: 11,
+            color: 'var(--text-ash)',
+            letterSpacing: 2,
+            marginTop: 6,
+            textTransform: 'uppercase',
+          }}
+        >
+          Day {day} · {weekdayLabel(seed)}
         </p>
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginTop: 14,
+        }}
+      >
+        <Mostaccio pose="proud" scale={3.5} />
+      </div>
+
+      <Card surface="table" padding={14} style={{ marginTop: 16 }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-pixel)',
+            fontSize: 11,
+            color: 'var(--accent-brass)',
+            letterSpacing: 1.5,
+            textTransform: 'uppercase',
+          }}
+        >
+          {user?.firstName ? `Hi, ${user.firstName}` : "Today's puzzle"}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            marginTop: 4,
+          }}
+        >
+          <h2
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 22,
+              fontWeight: 400,
+              color: 'var(--text-parchment)',
+              margin: 0,
+              lineHeight: 1.1,
+            }}
+          >
+            The Saloon
+          </h2>
+          <span
+            style={{
+              fontFamily: 'var(--font-pixel)',
+              fontSize: 12,
+              color: 'var(--text-parchment-dim)',
+            }}
+          >
+            {timeLeft}
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: 5,
+            marginTop: 14,
+            marginBottom: 14,
+            flexWrap: 'wrap',
+          }}
+        >
+          {letters.map((l, i) => (
+            <LetterTile key={i} letter={l} size={32} />
+          ))}
+        </div>
+
         {noFreeNoCredits ? (
-          <button
-            type="button"
+          <SaloonButton
+            variant="primary"
+            size="lg"
+            fullWidth
             onClick={handleBuyReplay}
-            className="w-full bg-amber-500 hover:bg-amber-400 active:scale-95 transition py-4 rounded-2xl text-xl font-semibold shadow-lg shadow-amber-900/50 mb-3"
           >
             Buy replay · {REPLAY_PRICE_STARS} ⭐
-          </button>
+          </SaloonButton>
         ) : (
-          <button
-            type="button"
-            onClick={handlePlay}
-            className="w-full bg-purple-600 hover:bg-purple-500 active:scale-95 transition py-4 rounded-2xl text-xl font-semibold shadow-lg shadow-purple-900/50 mb-3"
-          >
+          <SaloonButton variant="primary" size="lg" fullWidth onClick={handlePlay}>
             {playLabel}
-          </button>
+          </SaloonButton>
         )}
-        {proActive && (
-          <p className="text-xs text-amber-300 mb-3 font-semibold">
-            ⭐ Word Pro
-            {proExpiresAt
-              ? ` · until ${new Date(proExpiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
-              : ''}
-          </p>
-        )}
-        {playedToday && !proActive && (
-          <p className="text-xs text-slate-400 mb-3">
-            You already played today.{' '}
-            {replayCredits > 0
-              ? `${replayCredits} replay${replayCredits === 1 ? '' : 's'} ready.`
-              : 'Buy a replay to play again.'}
-          </p>
-        )}
-        <button
-          type="button"
-          onClick={handleShowLeaderboard}
-          className="w-full border border-slate-600 text-slate-200 active:scale-95 transition py-3 rounded-2xl text-base mb-3"
+      </Card>
+
+      {playedToday && !proActive && (
+        <p
+          style={{
+            fontSize: 11,
+            color: 'var(--text-parchment-dim)',
+            marginTop: 10,
+            textAlign: 'center',
+          }}
         >
-          Leaderboard
-        </button>
-        <button
-          type="button"
-          onClick={handleShowShop}
-          className="w-full border border-slate-600 text-slate-200 active:scale-95 transition py-3 rounded-2xl text-base mb-3"
-        >
-          🛒 Shop
-        </button>
+          You already played today.{' '}
+          {replayCredits > 0
+            ? `${replayCredits} replay${replayCredits === 1 ? '' : 's'} ready.`
+            : 'Buy a replay to play again.'}
+        </p>
+      )}
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          marginTop: 18,
+          alignItems: 'center',
+        }}
+      >
         <button
           type="button"
           onClick={handleInvite}
-          className="w-full text-purple-300 active:scale-95 transition py-2 rounded-2xl text-sm"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--accent-brass-hi)',
+            fontFamily: 'var(--font-ui)',
+            fontSize: 13,
+            fontWeight: 700,
+            padding: '6px 12px',
+            cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent',
+          }}
         >
-          📤 Invite friends
+          Invite friends
         </button>
         <button
           type="button"
           onClick={handleToggleSound}
-          className="w-full text-slate-500 active:scale-95 transition py-2 rounded-2xl text-xs"
           aria-pressed={soundOn}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-ash)',
+            fontFamily: 'var(--font-ui)',
+            fontSize: 11,
+            padding: '4px 8px',
+            cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent',
+          }}
         >
           {soundOn ? '🔊 Sound on' : '🔇 Sound off'}
         </button>
+      </div>
+
+      <div
+        style={{
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: 24,
+          paddingInline: 18,
+        }}
+      >
+        <Card surface="table" padding={4} bordered>
+          <TabBar active="home" onChange={handleTabChange} />
+        </Card>
       </div>
     </main>
   )

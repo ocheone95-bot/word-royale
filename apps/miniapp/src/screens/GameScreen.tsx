@@ -1,11 +1,29 @@
-// Игровой экран. Тап по тайлам собирает слово, Submit проверяет его в словаре,
-// валидное слово даёт очки и попадает в список найденных. Таймер появится дальше.
+// Игровой экран. Saloon-redesign: StatPanel'ы для score/time с warning,
+// Now Spelling display с brass border + glow, Mostaccio реагирует на
+// каждый submit, круглые LetterTile с amber glow при выборе.
+//
+// Game logic — без изменений (store driven). Меняем только presentation.
 
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { calculateScore } from '@word-royale/shared'
 import { useGameStore, type Feedback } from '../store/useGameStore'
 import { useDictionary } from '../hooks/useDictionary'
 import { hapticImpact } from '../lib/haptics'
+import { Mostaccio, type MostaccioPose } from '../components/Mostaccio'
+import { Card, LetterTile, SaloonButton, Scanlines, StatPanel } from '../components/saloon'
+
+function formatTimer(timeLeft: number): string {
+  const m = Math.floor(timeLeft / 60)
+  const s = timeLeft % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+function feedbackEyebrow(feedback: Feedback): { text: string; isError: boolean } {
+  if (feedback === 'invalid') return { text: 'Not a word', isError: true }
+  if (feedback === 'duplicate') return { text: 'Already found', isError: true }
+  if (feedback === 'too-short') return { text: 'Too short', isError: true }
+  return { text: 'Now spelling', isError: false }
+}
 
 export default function GameScreen() {
   const { dict, error } = useDictionary()
@@ -22,6 +40,50 @@ export default function GameScreen() {
   const goHome = useGameStore((s) => s.goHome)
   const toggleLetter = useGameStore((s) => s.toggleLetter)
   const clearSelection = useGameStore((s) => s.clearSelection)
+  const clearFeedback = useGameStore((s) => s.clearFeedback)
+  const submitWord = useGameStore((s) => s.submitWord)
+  const tickTimer = useGameStore((s) => s.tickTimer)
+
+  // Поза кота. Управляется локально, чтобы успеть «прыгнуть» на success
+  // и вернуться в idle через 800ms (feedback из store очищается за 700ms).
+  const [pose, setPose] = useState<MostaccioPose>('idle')
+  const lastFeedbackRef = useRef<Feedback>(null)
+
+  useEffect(() => {
+    if (!feedback) return
+    lastFeedbackRef.current = feedback
+    if (feedback === 'success') {
+      const last = foundWords[foundWords.length - 1] ?? ''
+      setPose(last.length >= 5 ? 'bigjump' : 'jump')
+    } else {
+      setPose('hmpf')
+    }
+    const t = setTimeout(() => {
+      setPose(selectedIndices.length > 0 ? 'tilt' : 'idle')
+      clearFeedback()
+    }, 700)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedback])
+
+  useEffect(() => {
+    // Когда feedback нет — поза определяется наличием выделения.
+    if (lastFeedbackRef.current) return
+    setPose(selectedIndices.length > 0 ? 'tilt' : 'idle')
+  }, [selectedIndices.length])
+
+  useEffect(() => {
+    const id = setInterval(tickTimer, 1000)
+    return () => clearInterval(id)
+  }, [tickTimer])
+
+  const currentWord = useMemo(
+    () => selectedIndices.map((i) => letters[i] ?? '').join(''),
+    [selectedIndices, letters],
+  )
+  const previewScore = calculateScore(currentWord)
+  const eyebrow = feedbackEyebrow(feedback)
+
   const handleGoHome = () => {
     hapticImpact('light')
     goHome()
@@ -30,247 +92,363 @@ export default function GameScreen() {
     hapticImpact('light')
     clearSelection()
   }
-  const clearFeedback = useGameStore((s) => s.clearFeedback)
-  const submitWord = useGameStore((s) => s.submitWord)
-  const tickTimer = useGameStore((s) => s.tickTimer)
+  const handleUndo = () => {
+    hapticImpact('light')
+    if (selectedIndices.length === 0) return
+    const last = selectedIndices[selectedIndices.length - 1]
+    toggleLetter(last) // тап по последней удаляет её
+  }
+  const handleSubmit = () => {
+    if (!dict || selectedIndices.length === 0) return
+    submitWord(dict)
+  }
 
-  // Сбрасываем feedback через 700ms — короткой подсветки достаточно
-  useEffect(() => {
-    if (!feedback) return
-    const t = setTimeout(clearFeedback, 700)
-    return () => clearTimeout(t)
-  }, [feedback, clearFeedback])
+  const wordSize =
+    currentWord.length >= 7 ? 36 : currentWord.length >= 5 ? 42 : 48
 
-  // Тик таймера раз в секунду; tickTimer сам остановится на 0 и переведёт на result
-  useEffect(() => {
-    const id = setInterval(tickTimer, 1000)
-    return () => clearInterval(id)
-  }, [tickTimer])
-
-  const currentWord = selectedIndices.map((i) => letters[i] ?? '').join('')
-  const previewScore = calculateScore(currentWord)
+  // Top row 4 tiles, bottom row 3 (по handoff offset вправо) — для узкого
+  // viewport оставляем простую центровку, более красивый offset — Phase D.
+  const topLetters = letters.slice(0, 4)
+  const bottomLetters = letters.slice(4, 7)
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex flex-col px-6 py-6 text-white">
-      <header className="flex items-center justify-between mb-6">
+    <main
+      style={{
+        minHeight: '100vh',
+        position: 'relative',
+        background:
+          'radial-gradient(ellipse at 50% 30%, rgba(255,140,66,0.2) 0%, transparent 55%), radial-gradient(circle at 50% 110%, rgba(0,0,0,0.7) 0%, transparent 65%), var(--bg-grain)',
+        color: 'var(--text-parchment)',
+        paddingInline: 14,
+        paddingTop: 12,
+        paddingBottom: 24,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <Scanlines enabled opacity={0.1} />
+
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <StatPanel label="Score" value={String(score)} />
         <button
           type="button"
           onClick={handleGoHome}
-          className="text-purple-300 active:scale-95 transition text-sm"
+          aria-label="Close"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-parchment-dim)',
+            fontFamily: 'var(--font-pixel)',
+            fontSize: 22,
+            cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent',
+            padding: 6,
+          }}
         >
-          ← Back
+          ×
         </button>
-        <Timer timeLeft={timeLeft} seed={seed} />
-        <div className="flex flex-col items-end">
-          <span className="text-base font-bold tabular-nums">{score}</span>
-          {doubleScoreActive && (
-            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
-              ×2 boost
-            </span>
-          )}
-        </div>
+        <StatPanel
+          label="Time"
+          value={formatTimer(timeLeft)}
+          warning={timeLeft <= 10 && timeLeft > 0}
+        />
       </header>
+
+      {doubleScoreActive && (
+        <p
+          style={{
+            textAlign: 'center',
+            marginTop: 6,
+            fontSize: 10,
+            fontFamily: 'var(--font-pixel)',
+            color: 'var(--accent-brass-hi)',
+            letterSpacing: 2,
+            textTransform: 'uppercase',
+            textShadow: '0 0 8px rgba(212,168,73,0.5)',
+          }}
+        >
+          ×2 boost
+        </p>
+      )}
 
       {error ? (
         <DictionaryError error={error} />
       ) : !dict ? (
         <LoadingDictionary />
       ) : (
-        <div className="flex-1 flex flex-col items-center">
-          <CurrentWord word={currentWord} previewScore={previewScore} feedback={feedback} />
+        <>
+          <Card surface="table" padding="14px 16px 18px" style={{ marginTop: 12 }}>
+            <p
+              style={{
+                fontFamily: 'var(--font-pixel)',
+                fontSize: 9,
+                color: eyebrow.isError ? 'var(--ember-warn-hi)' : 'var(--accent-brass)',
+                letterSpacing: 1.8,
+                textTransform: 'uppercase',
+                margin: 0,
+                lineHeight: 1,
+              }}
+            >
+              {eyebrow.text}
+            </p>
+            <h2
+              style={{
+                fontFamily: 'var(--font-pixel)',
+                fontSize: wordSize,
+                fontWeight: 700,
+                margin: '8px 0 0',
+                lineHeight: 1,
+                textTransform: 'uppercase',
+                letterSpacing: 6,
+                color: eyebrow.isError ? '#ff5a3d' : 'var(--glow-pixel)',
+                textShadow: eyebrow.isError
+                  ? '0 0 8px #ff5a3d'
+                  : '0 0 8px var(--glow-pixel), 0 0 18px var(--accent-lamp)',
+                minHeight: 48,
+              }}
+            >
+              {currentWord || ' '}
+            </h2>
+            {currentWord.length >= 3 && !eyebrow.isError && (
+              <p
+                style={{
+                  marginTop: 6,
+                  fontSize: 12,
+                  color: 'var(--text-parchment-dim)',
+                  fontFamily: 'var(--font-ui)',
+                }}
+              >
+                {currentWord.length} letters · +{previewScore}
+              </p>
+            )}
+          </Card>
 
-          <div className="grid grid-cols-4 gap-3 max-w-sm w-full mb-6 mt-6">
-            {letters.map((letter, i) => {
-              const order = selectedIndices.indexOf(i)
-              return (
-                <LetterTile
-                  key={i}
-                  letter={letter}
-                  order={order}
-                  onClick={() => toggleLetter(i)}
-                />
-              )
-            })}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              marginTop: 16,
+              minHeight: 28 * 2.8 + 20,
+            }}
+          >
+            <Mostaccio pose={pose} scale={2.8} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 max-w-sm w-full">
-            <button
-              type="button"
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 8,
+              marginTop: 8,
+            }}
+          >
+            <div style={{ display: 'flex', gap: 8 }}>
+              {topLetters.map((l, i) => (
+                <LetterTileForRack
+                  key={i}
+                  letter={l}
+                  index={i}
+                  selected={selectedIndices.indexOf(i) !== -1}
+                  order={selectedIndices.indexOf(i)}
+                  onClick={toggleLetter}
+                />
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {bottomLetters.map((l, i) => (
+                <LetterTileForRack
+                  key={i + 4}
+                  letter={l}
+                  index={i + 4}
+                  selected={selectedIndices.indexOf(i + 4) !== -1}
+                  order={selectedIndices.indexOf(i + 4)}
+                  onClick={toggleLetter}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              marginTop: 18,
+              paddingInline: 4,
+            }}
+          >
+            <SaloonButton
+              variant="secondary"
+              size="md"
+              onClick={handleUndo}
+              disabled={selectedIndices.length === 0}
+              style={{ flex: 1 }}
+            >
+              ↶ Undo
+            </SaloonButton>
+            <SaloonButton
+              variant="primary"
+              size="md"
+              onClick={handleSubmit}
+              disabled={selectedIndices.length < 3}
+              style={{ flex: 1.4 }}
+            >
+              ↵ Submit
+            </SaloonButton>
+            <SaloonButton
+              variant="secondary"
+              size="md"
               onClick={handleClear}
               disabled={selectedIndices.length === 0}
-              className="py-3 rounded-xl border border-slate-600 text-slate-300 active:scale-95 transition disabled:opacity-40 disabled:active:scale-100"
+              style={{ flex: 1 }}
             >
-              Clear
-            </button>
-            <button
-              type="button"
-              onClick={() => submitWord(dict)}
-              disabled={selectedIndices.length === 0}
-              className="py-3 rounded-xl bg-purple-600 text-white font-semibold active:scale-95 transition disabled:opacity-40 disabled:active:scale-100"
-            >
-              Submit
-            </button>
+              ⟲ Clear
+            </SaloonButton>
           </div>
 
-          <FoundWords words={foundWords} />
-        </div>
+          <FoundWordsCard words={foundWords} seed={seed} />
+        </>
       )}
     </main>
   )
 }
 
-function Timer({ timeLeft, seed }: { timeLeft: number; seed: string }) {
-  const minutes = Math.floor(timeLeft / 60)
-  const seconds = timeLeft % 60
-  const formatted = `${minutes}:${String(seconds).padStart(2, '0')}`
-  const danger = timeLeft <= 10
-  return (
-    <div className="flex flex-col items-center">
-      <span
-        className={`text-xl font-bold tabular-nums transition-colors ${
-          danger ? 'text-red-400 animate-pulse' : 'text-slate-100'
-        }`}
-      >
-        {formatted}
-      </span>
-      <span className="text-[10px] text-slate-500 font-mono">{seed}</span>
-    </div>
-  )
-}
-
-function CurrentWord({
-  word,
-  previewScore,
-  feedback,
-}: {
-  word: string
-  previewScore: number
-  feedback: Feedback
-}) {
-  const placeholder = !word
-  const colorClass =
-    feedback === 'success'
-      ? 'text-green-400'
-      : feedback === 'invalid' || feedback === 'too-short'
-      ? 'text-red-400'
-      : feedback === 'duplicate'
-      ? 'text-amber-400'
-      : 'text-white'
-
-  const message =
-    feedback === 'success'
-      ? '✓ Nice!'
-      : feedback === 'invalid'
-      ? 'Not in dictionary'
-      : feedback === 'too-short'
-      ? 'At least 3 letters'
-      : feedback === 'duplicate'
-      ? 'Already found'
-      : previewScore > 0
-      ? `+${previewScore}`
-      : ' '
-
-  return (
-    <div className="text-center min-h-[88px]">
-      <h2
-        className={`text-4xl font-bold uppercase tracking-widest transition-colors ${colorClass}`}
-      >
-        {placeholder ? <span className="text-slate-600">tap letters</span> : word}
-      </h2>
-      <p className={`mt-2 text-sm font-medium transition-colors ${colorClass}`}>{message}</p>
-    </div>
-  )
-}
-
-function LetterTile({
+function LetterTileForRack({
   letter,
+  index,
+  selected,
   order,
   onClick,
 }: {
   letter: string
+  index: number
+  selected: boolean
   order: number
-  onClick: () => void
+  onClick: (i: number) => void
 }) {
-  const selected = order !== -1
-  // Цвета и тени берутся из CSS-переменных, заданных активной темой в index.css.
-  // Поэтому смена темы перекрашивает тайлы без переключения React-кода.
-  const style: React.CSSProperties = selected
-    ? {
-        background: 'var(--tile-bg-selected)',
-        borderColor: 'var(--tile-border-selected)',
-        boxShadow: '0 10px 15px -3px var(--tile-shadow-selected)',
-        color: 'var(--tile-text-selected)',
-      }
-    : {
-        background: 'var(--tile-bg)',
-        borderColor: 'var(--tile-border)',
-        boxShadow: '0 10px 15px -3px var(--tile-shadow)',
-        color: 'var(--tile-text)',
-      }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={style}
-      className={`relative aspect-square flex items-center justify-center rounded-2xl text-3xl font-bold uppercase transition active:scale-95 ${
-        selected ? 'border-2 tile-pop' : 'border'
-      }`}
-    >
-      {letter}
-      {selected && (
-        <span
-          className="absolute top-1 right-1 text-[10px] font-mono"
-          style={{ color: 'var(--tile-order)' }}
-        >
-          {order + 1}
-        </span>
-      )}
-    </button>
+    <LetterTile
+      letter={letter}
+      size={50}
+      selected={selected}
+      order={selected ? order : null}
+      onClick={() => onClick(index)}
+    />
   )
 }
 
-function FoundWords({ words }: { words: readonly string[] }) {
+function FoundWordsCard({ words, seed }: { words: readonly string[]; seed: string }) {
   if (words.length === 0) {
     return (
-      <p className="text-slate-500 text-sm mt-8 text-center">
-        Find your first word to see it here.
+      <p
+        style={{
+          marginTop: 24,
+          textAlign: 'center',
+          fontSize: 11,
+          color: 'var(--text-ash)',
+          fontFamily: 'var(--font-ui)',
+        }}
+      >
+        Find your first word · {seed}
       </p>
     )
   }
   return (
-    <div className="mt-8 w-full max-w-sm">
-      <p className="text-xs uppercase tracking-widest text-slate-400 mb-2">
-        Found {words.length}
+    <Card surface="table" padding={12} style={{ marginTop: 18 }}>
+      <p
+        style={{
+          fontFamily: 'var(--font-pixel)',
+          fontSize: 9,
+          color: 'var(--accent-brass)',
+          letterSpacing: 1.8,
+          textTransform: 'uppercase',
+          margin: '0 0 6px',
+        }}
+      >
+        Found · {words.length}
       </p>
-      <div className="flex flex-wrap gap-2">
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
         {words.map((w) => (
           <span
             key={w}
-            className="px-2 py-1 rounded-md bg-slate-800/70 border border-slate-700 text-sm uppercase font-mono slide-up-fade"
+            style={{
+              padding: '3px 8px',
+              borderRadius: 999,
+              background: 'rgba(58,40,24,0.7)',
+              border: '1px solid rgba(212,168,73,0.3)',
+              fontFamily: 'var(--font-ui)',
+              fontWeight: 700,
+              fontSize: 11,
+              color: 'var(--text-parchment)',
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+            }}
           >
-            {w}
+            {w}{' '}
+            <span
+              style={{
+                color: 'var(--accent-brass)',
+                fontFamily: 'var(--font-pixel)',
+                fontSize: 10,
+                marginLeft: 2,
+              }}
+            >
+              +{calculateScore(w)}
+            </span>
           </span>
         ))}
       </div>
-    </div>
+    </Card>
   )
 }
 
 function LoadingDictionary() {
   return (
-    <div className="flex-1 flex items-center justify-center">
-      <p className="text-slate-400 text-sm">Loading dictionary…</p>
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--text-parchment-dim)',
+        fontSize: 13,
+      }}
+    >
+      Loading dictionary…
     </div>
   )
 }
 
 function DictionaryError({ error }: { error: Error }) {
   return (
-    <div className="flex-1 flex items-center justify-center px-6 text-center">
-      <div>
-        <p className="text-red-400 text-base font-semibold mb-2">Failed to load dictionary</p>
-        <p className="text-slate-400 text-xs font-mono">{error.message}</p>
-      </div>
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        padding: 24,
+      }}
+    >
+      <p style={{ color: '#ff5a3d', fontWeight: 700 }}>Failed to load dictionary</p>
+      <p
+        style={{
+          fontSize: 12,
+          color: 'var(--text-parchment-dim)',
+          fontFamily: 'monospace',
+          marginTop: 8,
+        }}
+      >
+        {error.message}
+      </p>
     </div>
   )
 }
