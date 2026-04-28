@@ -84,9 +84,24 @@ export default function ShopScreen() {
         <Section title="Replay">
           <ShopCard
             title="Extra game today"
-            description="Play today's puzzle one more time."
+            description={
+              proActive
+                ? 'Word Pro already gives you unlimited daily plays.'
+                : "Play today's puzzle one more time."
+            }
             price={`${REPLAY_PRICE_STARS} ⭐`}
-            badge={replayCredits > 0 ? `${replayCredits} owned` : null}
+            badge={
+              proActive
+                ? 'Included with Pro'
+                : replayCredits > 0
+                  ? `${replayCredits} owned`
+                  : null
+            }
+            buyLabel={
+              replayCredits > 0
+                ? `Buy more · ${REPLAY_PRICE_STARS} ⭐`
+                : `Buy · ${REPLAY_PRICE_STARS} ⭐`
+            }
             onBuy={handleBuyReplay}
           />
         </Section>

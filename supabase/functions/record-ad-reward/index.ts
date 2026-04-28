@@ -18,6 +18,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import { verifyInitData } from '../_shared/verify-init-data.ts';
+import { ADS_MAX_PER_DAY } from '../_shared/limits.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -25,8 +26,6 @@ const corsHeaders: Record<string, string> = {
     'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
-
-const MAX_ADS_PER_DAY = 3;
 
 interface Body {
   initData: string;
@@ -104,7 +103,7 @@ Deno.serve(async (req) => {
 
   const { data: rpcData, error: rpcErr } = await supabase.rpc('record_ad_watch', {
     p_user_id: userRow.id,
-    p_max_per_day: MAX_ADS_PER_DAY,
+    p_max_per_day: ADS_MAX_PER_DAY,
   });
   if (rpcErr) {
     return jsonResponse(500, {

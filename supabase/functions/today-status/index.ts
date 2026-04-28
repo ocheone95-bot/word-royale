@@ -21,6 +21,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import { verifyInitData } from '../_shared/verify-init-data.ts';
+import { ADS_MAX_PER_DAY } from '../_shared/limits.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -35,8 +36,6 @@ interface Body {
 }
 
 const DAILY_SEED_RE = /^\d{4}-\d{2}-\d{2}$/;
-// Должно совпадать с MAX_ADS_PER_DAY в record-ad-reward.
-const ADS_MAX_PER_DAY = 3;
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
