@@ -54,13 +54,25 @@ function readSelectedThemeFromStorage(): ThemeId {
   return 'default'
 }
 
+// product_id → room name из handoff'а Claude Design Phase D.
+// БД и Stars-инвойсы продолжают видеть старые product_id (theme_neon
+// / theme_retro / etc.), а data-theme на <html> ставим room name —
+// чтобы [data-theme="arcade"] блок в design-tokens.css сработал.
+const THEME_ROOM: Record<ThemeId, string | null> = {
+  default: null, // saloon — :root values, attribute снимаем
+  neon: 'arcade',
+  retro: 'diner',
+  sakura: 'kyoto',
+  cyberpunk: 'neoTokyo',
+}
+
 function applyThemeToDom(theme: ThemeId): void {
   if (typeof document === 'undefined') return
-  // 'default' — атрибут снимаем, чтобы CSS-переменные взялись из :root.
-  if (theme === 'default') {
+  const room = THEME_ROOM[theme]
+  if (room === null) {
     document.documentElement.removeAttribute('data-theme')
   } else {
-    document.documentElement.setAttribute('data-theme', theme)
+    document.documentElement.setAttribute('data-theme', room)
   }
 }
 

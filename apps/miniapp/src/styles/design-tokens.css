@@ -1,17 +1,25 @@
 /* ============================================================
-   WORD ROYALE — Design tokens (Phase A, sessions 10+).
-   Source: handoff "Saloon-at-night" by Claude Design.
-   These tokens live alongside the legacy --tile-* variables in
-   index.css for now — Phase C переключит экраны на новую палитру.
+   WORD ROYALE — Design tokens (Phase A + Phase D, sessions 10–11).
+   Source: handoff "Saloon-at-night" by Claude Design + Phase D
+   theme presets (arcade / diner / kyoto / neoTokyo).
+
+   Theme switching:
+   - :root holds the default «Saloon» palette.
+   - [data-theme="arcade|diner|kyoto|neoTokyo"] override the basic
+     colour tokens; gradient tokens (--gradient-*) re-evaluate
+     automatically because they reference the basic ones via var().
+   - Mapping ThemeId → data-theme room is in store/useGameStore.ts:
+     neon→arcade, retro→diner, sakura→kyoto, cyberpunk→neoTokyo.
    ============================================================ */
 
 :root {
   /* --- Surface tones (warm dark, never cold) --- */
   --bg-room: #1a1108;
+  --bg-grain: #25190d;
   --bg-table: #2d1f12;
   --bg-leather: #3a2818;
   --bg-leather-hi: #4a341f;
-  --bg-grain: #25190d;
+  --bg-deep: #0a0604;
 
   /* --- Ink (text) --- */
   --text-parchment: #f4e4bc;
@@ -27,6 +35,11 @@
   --accent-brass-hi: #e8c062;
   --glow-pixel: #ffb84d;
 
+  /* --- Tint of the page top-light (radial-gradient overlay).
+         Stored as plain rgba so themes can override; can't reuse
+         --accent-lamp directly without color-mix support. --- */
+  --tint-page: rgba(255, 140, 66, 0.18);
+
   /* --- States --- */
   --ember-warn: #9a3f1c;
   --ember-warn-hi: #b8552c;
@@ -39,6 +52,18 @@
     0 0 36px rgba(255, 140, 66, 0.35);
   --glow-brass: 0 0 6px #e8c062, 0 0 14px rgba(212, 168, 73, 0.5);
 
+  /* --- Composite gradients. They reference the basic tokens above
+         via var(), so overriding any [data-theme] block re-paints
+         every Card/LetterTile/screen background automatically. --- */
+  --gradient-page:
+    radial-gradient(circle at 50% -10%, var(--tint-page) 0%, transparent 45%),
+    radial-gradient(circle at 50% 110%, rgba(0, 0, 0, 0.5) 0%, transparent 60%),
+    var(--bg-room);
+  --gradient-card-table:
+    linear-gradient(180deg, var(--bg-table) 0%, var(--bg-room) 100%);
+  --gradient-tile:
+    radial-gradient(circle at 38% 32%, var(--bg-leather) 0%, var(--bg-deep) 95%);
+
   /* --- Rhythm --- */
   --r-tile: 4px;
   --r-card: 8px;
@@ -48,6 +73,75 @@
   --font-display: "Bagel Fat One", "Cooper Black", Georgia, serif;
   --font-ui: "Nunito", "DM Sans", system-ui, sans-serif;
   --font-pixel: "Pixelify Sans", "Press Start 2P", monospace;
+}
+
+/* ============================================================
+   Theme: Arcade (mapped from product_id 'neon')
+   Electric blue cabinet under midnight.
+   ============================================================ */
+[data-theme="arcade"] {
+  --bg-room: #0a0820;
+  --bg-grain: #04031a;
+  --bg-table: #15182c;
+  --bg-leather: #1f2238;
+  --bg-leather-hi: #2c3050;
+  --bg-deep: #04031a;
+
+  --accent-lamp: #42d4ff;
+  --accent-lamp-hi: #9adfff;
+  --accent-lamp-lo: #1f9fcf;
+  --accent-brass: #42d4ff;
+  --accent-brass-hi: #9adfff;
+  --glow-pixel: #9adfff;
+
+  --tint-page: rgba(66, 212, 255, 0.18);
+  --glow-brass: 0 0 6px #9adfff, 0 0 14px rgba(66, 212, 255, 0.5);
+}
+
+/* ============================================================
+   Theme: Diner '74 (mapped from product_id 'retro')
+   Mustard sign over sienna walls.
+   ============================================================ */
+[data-theme="diner"] {
+  --bg-room: #2a1808;
+  --bg-grain: #1a0c04;
+  --bg-table: #5a2010;
+  --bg-leather: #6f2a14;
+  --bg-leather-hi: #88361e;
+  --bg-deep: #1a0c04;
+
+  --accent-lamp: #c4541f;
+  --accent-lamp-hi: #f4c542;
+  --accent-lamp-lo: #8a3a14;
+  --accent-brass: #f4c542;
+  --accent-brass-hi: #ffd866;
+  --glow-pixel: #f4c542;
+
+  --tint-page: rgba(196, 84, 31, 0.18);
+  --glow-brass: 0 0 6px #ffd866, 0 0 14px rgba(244, 197, 66, 0.5);
+}
+
+/* ============================================================
+   Theme: Kyoto (mapped from product_id 'sakura')
+   Cherry-blossom pink on dark wood.
+   ============================================================ */
+[data-theme="kyoto"] {
+  --bg-room: #1a0d12;
+  --bg-grain: #0a0508;
+  --bg-table: #5a2840;
+  --bg-leather: #6e3450;
+  --bg-leather-hi: #834161;
+  --bg-deep: #0a0508;
+
+  --accent-lamp: #c44878;
+  --accent-lamp-hi: #ffb8d4;
+  --accent-lamp-lo: #8a2f55;
+  --accent-brass: #ffb8d4;
+  --accent-brass-hi: #ffd0e2;
+  --glow-pixel: #ffb8d4;
+
+  --tint-page: rgba(196, 72, 120, 0.18);
+  --glow-brass: 0 0 6px #ffd0e2, 0 0 14px rgba(255, 184, 212, 0.5);
 }
 
 /* CRT scanline overlay — применяется per-screen, не глобально.

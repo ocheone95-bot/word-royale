@@ -152,7 +152,7 @@ export default function ResultScreen() {
         minHeight: '100vh',
         position: 'relative',
         background:
-          'radial-gradient(circle at 50% 25%, rgba(255,140,66,0.2) 0%, transparent 55%), var(--bg-room)',
+          'radial-gradient(circle at 50% 25%, var(--tint-page) 0%, transparent 55%), var(--bg-room)',
         color: 'var(--text-parchment)',
         paddingInline: 18,
         paddingTop: 14,

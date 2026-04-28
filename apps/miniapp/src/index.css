@@ -1,69 +1,6 @@
 @import "tailwindcss";
 @import "./styles/design-tokens.css";
 
-/* Темы букв (LetterTile). Применяются через [data-theme="..."] на <html>.
-   Дефолтная тема (purple) живёт в :root. */
-
-:root {
-  --tile-bg: rgb(30 41 59 / 0.7);
-  --tile-border: rgb(168 85 247 / 0.3);
-  --tile-shadow: rgb(76 29 149 / 0.3);
-  --tile-text: rgb(255 255 255);
-  --tile-bg-selected: rgb(147 51 234);
-  --tile-border-selected: rgb(216 180 254);
-  --tile-shadow-selected: rgb(126 34 206 / 0.5);
-  --tile-text-selected: rgb(255 255 255);
-  --tile-order: rgb(216 180 254);
-}
-
-[data-theme="neon"] {
-  --tile-bg: rgb(8 47 73 / 0.85);
-  --tile-border: rgb(34 211 238 / 0.6);
-  --tile-shadow: rgb(34 211 238 / 0.4);
-  --tile-text: rgb(165 243 252);
-  --tile-bg-selected: rgb(34 211 238);
-  --tile-border-selected: rgb(207 250 254);
-  --tile-shadow-selected: rgb(34 211 238 / 0.6);
-  --tile-text-selected: rgb(8 47 73);
-  --tile-order: rgb(8 47 73);
-}
-
-[data-theme="retro"] {
-  --tile-bg: rgb(254 215 170 / 0.95);
-  --tile-border: rgb(154 52 18 / 0.5);
-  --tile-shadow: rgb(154 52 18 / 0.3);
-  --tile-text: rgb(124 45 18);
-  --tile-bg-selected: rgb(234 88 12);
-  --tile-border-selected: rgb(254 215 170);
-  --tile-shadow-selected: rgb(154 52 18 / 0.5);
-  --tile-text-selected: rgb(255 247 237);
-  --tile-order: rgb(255 247 237);
-}
-
-[data-theme="sakura"] {
-  --tile-bg: rgb(252 231 243 / 0.95);
-  --tile-border: rgb(190 24 93 / 0.4);
-  --tile-shadow: rgb(190 24 93 / 0.25);
-  --tile-text: rgb(131 24 67);
-  --tile-bg-selected: rgb(236 72 153);
-  --tile-border-selected: rgb(252 231 243);
-  --tile-shadow-selected: rgb(190 24 93 / 0.5);
-  --tile-text-selected: rgb(255 255 255);
-  --tile-order: rgb(252 231 243);
-}
-
-[data-theme="cyberpunk"] {
-  --tile-bg: rgb(20 0 30 / 0.95);
-  --tile-border: rgb(244 114 182 / 0.7);
-  --tile-shadow: rgb(217 70 239 / 0.5);
-  --tile-text: rgb(244 114 182);
-  --tile-bg-selected: rgb(250 204 21);
-  --tile-border-selected: rgb(244 114 182);
-  --tile-shadow-selected: rgb(250 204 21 / 0.6);
-  --tile-text-selected: rgb(20 0 30);
-  --tile-order: rgb(20 0 30);
-}
-
 /* Анимации полировки. Все короткие (≤ 250 ms) — Telegram Mini Apps на
    Android любят дёргать transitions, длинные раздражают. */
 

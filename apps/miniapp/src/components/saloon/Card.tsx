@@ -16,7 +16,7 @@ interface CardProps {
 }
 
 const BG: Record<Surface, string> = {
-  table: 'linear-gradient(180deg, #2d1f12 0%, #1a1108 100%)',
+  table: 'var(--gradient-card-table)',
   leather: 'var(--bg-leather)',
 }
 

@@ -74,7 +74,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
         minHeight: '100vh',
         position: 'relative',
         background:
-          'radial-gradient(circle at 50% 0%, rgba(255,140,66,0.18) 0%, transparent 50%), var(--bg-room)',
+          'radial-gradient(circle at 50% 0%, var(--tint-page) 0%, transparent 50%), var(--bg-room)',
         color: 'var(--text-parchment)',
         paddingInline: 24,
         paddingTop: 16,

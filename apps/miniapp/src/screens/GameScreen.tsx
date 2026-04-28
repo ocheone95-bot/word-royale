@@ -117,7 +117,7 @@ export default function GameScreen() {
         minHeight: '100vh',
         position: 'relative',
         background:
-          'radial-gradient(ellipse at 50% 30%, rgba(255,140,66,0.2) 0%, transparent 55%), radial-gradient(circle at 50% 110%, rgba(0,0,0,0.7) 0%, transparent 65%), var(--bg-grain)',
+          'radial-gradient(ellipse at 50% 30%, var(--tint-page) 0%, transparent 55%), radial-gradient(circle at 50% 110%, rgba(0,0,0,0.7) 0%, transparent 65%), var(--bg-grain)',
         color: 'var(--text-parchment)',
         paddingInline: 14,
         paddingTop: 12,

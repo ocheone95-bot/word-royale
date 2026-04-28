@@ -210,8 +210,7 @@ export default function ShopScreen() {
       style={{
         minHeight: '100vh',
         position: 'relative',
-        background:
-          'radial-gradient(circle at 50% -10%, rgba(255,140,66,0.18) 0%, transparent 45%), radial-gradient(circle at 50% 110%, rgba(0,0,0,0.5) 0%, transparent 60%), var(--bg-room)',
+        background: 'var(--gradient-page)',
         color: 'var(--text-parchment)',
         paddingInline: 18,
         paddingTop: 14,

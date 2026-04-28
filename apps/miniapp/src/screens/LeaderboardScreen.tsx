@@ -111,7 +111,7 @@ export default function LeaderboardScreen() {
         minHeight: '100vh',
         position: 'relative',
         background:
-          'radial-gradient(circle at 50% 0%, rgba(255,140,66,0.15) 0%, transparent 45%), var(--bg-room)',
+          'radial-gradient(circle at 50% 0%, var(--tint-page) 0%, transparent 45%), var(--bg-room)',
         color: 'var(--text-parchment)',
         paddingInline: 18,
         paddingTop: 14,
@@ -349,8 +349,8 @@ function PodiumColumn({
   const barHeight = rank === 1 ? 84 : rank === 2 ? 60 : 48
   const barBg =
     rank === 1
-      ? 'linear-gradient(180deg, #d4a849 0%, #8a6a26 100%)'
-      : 'linear-gradient(180deg, #3a2818 0%, #2d1f12 100%)'
+      ? 'linear-gradient(180deg, var(--accent-brass-hi) 0%, var(--accent-brass) 100%)'
+      : 'linear-gradient(180deg, var(--bg-leather) 0%, var(--bg-table) 100%)'
   const isFirst = rank === 1
   return (
     <div

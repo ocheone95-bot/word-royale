@@ -25,9 +25,9 @@ const IDLE_SHADOW = [
 ].join(', ')
 
 const SELECTED_SHADOW = [
-  '0 0 0 3px #ff8c42',
-  '0 0 24px #ff8c42',
-  '0 0 44px #ff8c42',
+  '0 0 0 3px var(--accent-lamp)',
+  '0 0 24px var(--accent-lamp)',
+  '0 0 44px var(--accent-lamp)',
   'inset 0 -4px 10px rgba(0,0,0,.6)',
   'inset 0 2px 5px rgba(255,255,255,.25)',
 ].join(', ')
@@ -48,8 +48,7 @@ export function LetterTile({
     height: size,
     borderRadius: '50%',
     border: '3px solid var(--accent-brass)',
-    background:
-      'radial-gradient(circle at 38% 32%, #3a2818 0%, #0a0604 95%)',
+    background: 'var(--gradient-tile)',
     boxShadow: selected ? SELECTED_SHADOW : IDLE_SHADOW,
     transform: selected ? 'translateY(-7px) scale(1.05)' : 'none',
     transition: 'transform 160ms cubic-bezier(.34,1.56,.64,1), box-shadow 160ms ease-out',
