@@ -46,6 +46,31 @@ export async function grantReplayCredit(params: {
   return { userId: row.user_id, wasNew: row.was_new };
 }
 
+// Атомарно: upsert юзера + запись в purchases + установка
+// users.double_score_date на сегодняшнюю дату. Idempotent по telegram_payment_id.
+export async function grantDoubleScore(params: {
+  telegramId: number;
+  username: string | null;
+  firstName: string | null;
+  telegramPaymentId: string;
+  starsAmount: number;
+}): Promise<{ userId: string; wasNew: boolean }> {
+  const { data, error } = await getSupabase().rpc('grant_double_score', {
+    p_telegram_id: params.telegramId,
+    p_username: params.username,
+    p_first_name: params.firstName,
+    p_telegram_payment_id: params.telegramPaymentId,
+    p_stars_amount: params.starsAmount,
+  });
+
+  if (error) throw error;
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('grant_double_score returned no row');
+  }
+  const row = data[0] as { user_id: string; was_new: boolean };
+  return { userId: row.user_id, wasNew: row.was_new };
+}
+
 // Атомарно: upsert юзера + запись в purchases + idempotent insert в user_themes.
 // Возвращает was_new=false, если этот telegram_payment_id уже обрабатывался.
 export async function grantTheme(params: {

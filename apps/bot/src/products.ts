@@ -11,7 +11,7 @@ export const THEME_IDS: readonly ThemeId[] = [
   'cyberpunk',
 ];
 
-export type ProductId = 'replay' | `theme_${ThemeId}`;
+export type ProductId = 'replay' | 'double_score' | `theme_${ThemeId}`;
 
 export interface Product {
   id: ProductId;
@@ -26,6 +26,12 @@ export const PRODUCTS: Record<ProductId, Product> = {
     title: 'Extra game today',
     description: "Play today's puzzle one more time and try to beat your score.",
     starsAmount: 50,
+  },
+  double_score: {
+    id: 'double_score',
+    title: 'Double score',
+    description: 'Multiply the score of your next game today by 2×.',
+    starsAmount: 200,
   },
   theme_neon: {
     id: 'theme_neon',

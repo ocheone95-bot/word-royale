@@ -68,6 +68,7 @@ export async function sendReplayInvoice(ctx: Context): Promise<void> {
 
 export function registerBuyHandlers(bot: Bot): void {
   bot.command('buy_replay', sendReplayInvoice);
+  bot.command('buy_double_score', (ctx) => sendProductInvoice(ctx, 'double_score'));
   for (const themeId of THEME_IDS) {
     const productId: ProductId = `theme_${themeId}`;
     // Дефис в названии команды Telegram не допускает, поэтому /buy_theme_neon.

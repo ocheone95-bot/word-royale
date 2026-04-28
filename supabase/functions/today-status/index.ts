@@ -7,6 +7,7 @@
 //     replayCredits: number,        // купленных и неиспользованных
 //     freeGameAvailable: boolean,   // !playedToday — удобство для UI
 //     themes: string[],             // theme_id-шки купленных тем
+//     doubleScoreActive: boolean,   // буст ×2 куплен на сегодня и не потрачен
 //   }
 //
 // Используется HomeScreen / ResultScreen / ShopScreen — для подсветки купленных
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
 
   const { data: meRow, error: meErr } = await supabase
     .from('users')
-    .select('id, replay_credits')
+    .select('id, replay_credits, double_score_date')
     .eq('telegram_id', verified.user.id)
     .maybeSingle();
   if (meErr) {
@@ -102,6 +103,7 @@ Deno.serve(async (req) => {
       replayCredits: 0,
       freeGameAvailable: true,
       themes: [],
+      doubleScoreActive: false,
     });
   }
 
@@ -132,11 +134,15 @@ Deno.serve(async (req) => {
 
   const playedToday = (count ?? 0) > 0;
   const themes = (themesRows ?? []).map((r) => r.theme_id as string);
+  const doubleScoreActive =
+    typeof meRow.double_score_date === 'string' &&
+    meRow.double_score_date === body.dailySeed;
   return jsonResponse(200, {
     ok: true,
     playedToday,
     replayCredits: meRow.replay_credits as number,
     freeGameAvailable: !playedToday,
     themes,
+    doubleScoreActive,
   });
 });

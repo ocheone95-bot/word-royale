@@ -27,6 +27,7 @@ export type TodayStatusState =
       playedToday: boolean
       replayCredits: number
       themes: string[]
+      doubleScoreActive: boolean
     }
 
 const SELECTED_THEME_KEY = 'wr.selectedTheme'
@@ -71,6 +72,8 @@ interface GameState {
   submitStatus: SubmitStatus
   submitError: string | null
   serverScore: number | null
+  // boost ×2 потрачен на этой сессии — UI покажет «×2 applied» рядом со счётом
+  doubleScoreApplied: boolean
 
   // статус юзера на сегодня — играл ли уже и сколько replay-токенов
   todayStatus: TodayStatusState
@@ -110,6 +113,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   submitStatus: 'idle',
   submitError: null,
   serverScore: null,
+  doubleScoreApplied: false,
 
   todayStatus: { loaded: false },
 
@@ -145,6 +149,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       submitStatus: 'idle',
       submitError: null,
       serverScore: null,
+      doubleScoreApplied: false,
     })
   },
 
@@ -219,21 +224,25 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({
         submitStatus: 'success',
         serverScore: result.score,
+        doubleScoreApplied: result.doubleScoreUsed,
         submitError: null,
         // На сегодня юзер уже точно играл; кредиты могли уменьшиться
-        // (если это была replay-сессия).
+        // (если это была replay-сессия). Если буст потратился — флаг тушим.
         todayStatus: {
           loaded: true,
           playedToday: true,
           replayCredits: result.replayCreditsLeft,
           themes: prevThemes,
+          doubleScoreActive: false,
         },
       })
     } else {
       // При no_replay сервер уже знает, что юзер играл сегодня и кредитов нет —
       // обновляем todayStatus, чтобы Home корректно показал «Buy replay» и не
-      // светил кнопкой Play, ведущей в тот же тупик.
+      // светил кнопкой Play, ведущей в тот же тупик. Boost не трогаем — сессия
+      // не записалась, double_score_date в БД остался.
       if (result.error === 'no_replay') {
+        const prevDouble = prevStatus.loaded ? prevStatus.doubleScoreActive : false
         set({
           submitStatus: 'error',
           submitError: result.error,
@@ -242,6 +251,7 @@ export const useGameStore = create<GameState>((set, get) => ({
             playedToday: true,
             replayCredits: 0,
             themes: prevThemes,
+            doubleScoreActive: prevDouble,
           },
         })
       } else {
@@ -265,6 +275,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         playedToday: result.playedToday,
         replayCredits: result.replayCredits,
         themes: result.themes,
+        doubleScoreActive: result.doubleScoreActive,
       },
     })
   },

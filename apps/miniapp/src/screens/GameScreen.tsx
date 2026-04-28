@@ -15,6 +15,9 @@ export default function GameScreen() {
   const score = useGameStore((s) => s.score)
   const feedback = useGameStore((s) => s.feedback)
   const timeLeft = useGameStore((s) => s.timeLeft)
+  const todayStatus = useGameStore((s) => s.todayStatus)
+  const doubleScoreActive =
+    todayStatus.loaded && todayStatus.doubleScoreActive
   const goHome = useGameStore((s) => s.goHome)
   const toggleLetter = useGameStore((s) => s.toggleLetter)
   const clearSelection = useGameStore((s) => s.clearSelection)
@@ -49,7 +52,14 @@ export default function GameScreen() {
           ← Back
         </button>
         <Timer timeLeft={timeLeft} seed={seed} />
-        <span className="text-base font-bold tabular-nums">{score}</span>
+        <div className="flex flex-col items-end">
+          <span className="text-base font-bold tabular-nums">{score}</span>
+          {doubleScoreActive && (
+            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+              ×2 boost
+            </span>
+          )}
+        </div>
       </header>
 
       {error ? (

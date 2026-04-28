@@ -13,7 +13,11 @@ import {
   themeIdFromProductId,
 } from '../products.js';
 import { parseInvoicePayload } from './buy.js';
-import { grantReplayCredit, grantTheme } from '../supabase.js';
+import {
+  grantDoubleScore,
+  grantReplayCredit,
+  grantTheme,
+} from '../supabase.js';
 
 export function registerPaymentHandlers(bot: Bot): void {
   bot.on('pre_checkout_query', async (ctx) => {
@@ -85,6 +89,11 @@ export function registerPaymentHandlers(bot: Bot): void {
         wasNew = result.wasNew;
         successText =
           '✅ Payment received! You got *1 extra game today* — open Word Royale and play again.';
+      } else if (parsed.productId === 'double_score') {
+        const result = await grantDoubleScore(grantBase);
+        wasNew = result.wasNew;
+        successText =
+          '✅ Payment received! *Double score* is active — your next game today will count for 2×.';
       } else if (isThemeProductId(parsed.productId)) {
         const themeId = themeIdFromProductId(parsed.productId);
         const product = getProduct(parsed.productId);

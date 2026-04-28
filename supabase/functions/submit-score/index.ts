@@ -218,6 +218,8 @@ Deno.serve(async (req) => {
     was_replay: boolean | null;
     replay_credits_left: number | null;
     result_code: string;
+    score_applied: number | null;
+    double_score_used: boolean | null;
   };
   if (result.result_code === 'no_replay') {
     return jsonResponse(403, {
@@ -234,12 +236,15 @@ Deno.serve(async (req) => {
     });
   }
 
+  // score_applied = expectedScore × 2, если double_score_used=true. Возвращаем
+  // клиенту его, чтобы UI и лидерборд показали один и тот же финальный счёт.
   return jsonResponse(200, {
     ok: true,
-    score: expectedScore,
+    score: result.score_applied ?? expectedScore,
     wordsCount: normalized.length,
     seed: todaySeed,
     wasReplay: result.was_replay ?? false,
     replayCreditsLeft: result.replay_credits_left ?? 0,
+    doubleScoreUsed: result.double_score_used ?? false,
   });
 });

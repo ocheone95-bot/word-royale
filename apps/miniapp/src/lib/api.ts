@@ -37,6 +37,7 @@ export interface SubmitSessionSuccess {
   seed: string
   wasReplay: boolean
   replayCreditsLeft: number
+  doubleScoreUsed: boolean
 }
 
 export interface SubmitSessionFailure {
@@ -94,6 +95,7 @@ export interface TodayStatus {
   replayCredits: number
   freeGameAvailable: boolean
   themes: string[]
+  doubleScoreActive: boolean
 }
 
 interface TodayStatusSuccess extends TodayStatus {
@@ -142,6 +144,7 @@ export async function fetchTodayStatus(
     replayCredits: Number(j.replayCredits ?? 0),
     freeGameAvailable: Boolean(j.freeGameAvailable),
     themes: Array.isArray(j.themes) ? (j.themes as string[]) : [],
+    doubleScoreActive: Boolean(j.doubleScoreActive),
   }
 }
 

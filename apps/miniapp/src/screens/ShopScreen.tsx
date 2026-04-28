@@ -8,6 +8,7 @@ import { useEffect } from 'react'
 import { useRawInitData } from '@telegram-apps/sdk-react'
 import { useGameStore, type ThemeId } from '../store/useGameStore'
 import {
+  buildBuyDeepLink,
   buildBuyReplayDeepLink,
   buildBuyThemeDeepLink,
 } from '../lib/share'
@@ -53,10 +54,14 @@ export default function ShopScreen() {
 
   const replayCredits = todayStatus.loaded ? todayStatus.replayCredits : 0
   const ownedThemes = todayStatus.loaded ? todayStatus.themes : []
+  const doubleScoreActive =
+    todayStatus.loaded && todayStatus.doubleScoreActive
 
   const handleBuyReplay = () => openTelegramLink(buildBuyReplayDeepLink())
   const handleBuyTheme = (id: ThemeId) =>
     openTelegramLink(buildBuyThemeDeepLink(id))
+  const handleBuyDoubleScore = () =>
+    openTelegramLink(buildBuyDeepLink('double_score'))
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 px-6 py-8 text-white">
@@ -104,10 +109,10 @@ export default function ShopScreen() {
         <Section title="Boosts">
           <ShopCard
             title="Double Score"
-            description="Multiply today's score by 2× on your next game."
+            description="Multiply the score of your next game today by 2×."
             price="200 ⭐"
-            disabled
-            disabledLabel="Coming soon"
+            badge={doubleScoreActive ? 'Active' : null}
+            onBuy={handleBuyDoubleScore}
           />
         </Section>
 

@@ -40,6 +40,8 @@ function describeError(code: string | null): string {
 
 export default function ResultScreen() {
   const score = useGameStore((s) => s.score)
+  const serverScore = useGameStore((s) => s.serverScore)
+  const doubleScoreApplied = useGameStore((s) => s.doubleScoreApplied)
   const foundWords = useGameStore((s) => s.foundWords)
   const seed = useGameStore((s) => s.seed)
   const startGame = useGameStore((s) => s.startGame)
@@ -59,6 +61,9 @@ export default function ResultScreen() {
     }
   }, [initData, submitStatus, submitCurrentSession])
 
+  // serverScore = клиентский score × 2, если был активен Double Score boost.
+  // До серверного ответа показываем клиентский счёт.
+  const displayScore = serverScore ?? score
   const longest = foundWords.reduce((a, b) => (b.length > a.length ? b : a), '')
   const sorted = [...foundWords].sort((a, b) => b.length - a.length || a.localeCompare(b))
 
@@ -80,7 +85,7 @@ export default function ResultScreen() {
     if (!canShare) return
     const text = buildShareText({
       seed,
-      score,
+      score: displayScore,
       wordsCount: foundWords.length,
       longest: longest || null,
     })
@@ -105,8 +110,13 @@ export default function ResultScreen() {
       <div className="flex-1 flex flex-col items-center">
         <p className="text-purple-300 mb-2 text-sm uppercase tracking-widest">Time's up</p>
         <h1 className="text-7xl font-bold tracking-tight mb-1 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent tabular-nums">
-          {score}
+          {displayScore}
         </h1>
+        {doubleScoreApplied && (
+          <p className="mb-2 text-xs font-bold text-amber-400 uppercase tracking-widest">
+            ×2 boost applied
+          </p>
+        )}
         <p className="text-slate-400 text-sm mb-6">
           {foundWords.length} word{foundWords.length === 1 ? '' : 's'}
           {longest ? ` · longest: ${longest.toUpperCase()}` : ''}
