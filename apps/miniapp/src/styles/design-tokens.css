@@ -122,6 +122,40 @@
 }
 
 /* ============================================================
+   Theme: Neo-Tokyo (mapped from product_id 'cyberpunk')
+   Akira homage: magenta + electric yellow on void.
+   Harsh CRT, no warm parchment — neon mistress.
+   ============================================================ */
+[data-theme="neoTokyo"] {
+  --bg-room: #0a0010;
+  --bg-grain: #050008;
+  --bg-table: #1a0020;
+  --bg-leather: #240030;
+  --bg-leather-hi: #380050;
+  --bg-deep: #050008;
+
+  --text-parchment: #fff0ff;
+  --text-parchment-dim: #c4a8c4;
+  --text-ash: #7a5878;
+  --text-charcoal: #0a0010;
+
+  --accent-lamp: #ff00ff;
+  --accent-lamp-hi: #ffff00;
+  --accent-lamp-lo: #b300b3;
+  --accent-brass: #ffd700;
+  --accent-brass-hi: #ffff00;
+  --glow-pixel: #ffff00;
+
+  --tint-page: rgba(255, 0, 255, 0.22);
+  --glow-brass: 0 0 6px #ffff00, 0 0 14px rgba(255, 215, 0, 0.6);
+  --glow-sm: 0 0 4px var(--glow-pixel), 0 0 8px rgba(255, 0, 255, 0.55);
+  --glow-md: 0 0 6px var(--glow-pixel), 0 0 14px rgba(255, 0, 255, 0.6),
+    0 0 24px rgba(255, 255, 0, 0.3);
+  --glow-lg: 0 0 8px var(--glow-pixel), 0 0 18px rgba(255, 0, 255, 0.65),
+    0 0 36px rgba(255, 255, 0, 0.4);
+}
+
+/* ============================================================
    Theme: Kyoto (mapped from product_id 'sakura')
    Cherry-blossom pink on dark wood.
    ============================================================ */
