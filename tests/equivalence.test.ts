@@ -1,13 +1,12 @@
-// Snapshot-тест эквивалентности игровой логики на клиенте и сервере.
+// Sanity-тест игровой логики из @word-royale/shared.
 //
-// Логика дублирована в двух местах (см. memory edge_function_shared_dup):
-//   - packages/shared/src/{scoring,daily-seed}.ts → используется Vite-фронтом
-//   - supabase/functions/_shared/game.ts          → используется Edge Function
-//
-// Дубль продиктован тем, что Deno-бандлер Edge Functions не любит .js-импорты,
-// которыми пользуется shared (NodeNext module resolution). Пока живём с дублем —
-// этот тест не даёт двум копиям разъехаться: при любой правке одной стороны
-// без зеркала на другой стороне CI/локальный `npm test` падает с понятной диагностикой.
+// Раньше тут была защита от дрейфа между packages/shared и
+// supabase/functions/_shared/game.ts (Deno не любил .js-импорты в TS).
+// Сейчас _shared/game.ts — это re-export из packages/shared (allowImportingTsExtensions),
+// так что «client» и «server» — буквально один и тот же модуль.
+// Тест оставлен как набор поведенческих кейсов: scoring, daily-seed детерминизм,
+// cross-day разнообразие. Если в будущем Deno снова не сможет читать shared —
+// вернём дубль и роль теста снова станет защитой эквивалентности.
 
 import { describe, expect, it } from 'vitest';
 
