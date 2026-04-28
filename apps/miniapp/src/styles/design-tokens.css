@@ -72,3 +72,18 @@
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
+
+/* Keyframes из handoff phase5.jsx — пульс предупреждения у TimerPanel
+   когда осталось ≤10s. Используется через `animation: saloonPulseWarn ...`. */
+@keyframes saloonPulseWarn {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(255, 90, 61, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(255, 90, 61, 0.85);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanlines { display: none; }
+}
