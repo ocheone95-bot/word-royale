@@ -12,9 +12,11 @@
   },
   "scripts": {
     "seed:dictionary": "node --env-file=.env.local packages/dictionary/scripts/seed-db.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:bot-avatar": "node scripts/generate-bot-avatar.mjs"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "supabase": "^2.95.4",
     "vitest": "^4.1.5"
   }
