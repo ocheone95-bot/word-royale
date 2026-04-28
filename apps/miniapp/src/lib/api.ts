@@ -98,6 +98,8 @@ export interface TodayStatus {
   doubleScoreActive: boolean
   proActive: boolean
   proExpiresAt: string | null
+  adsWatchedToday: number
+  adsMaxPerDay: number
 }
 
 interface TodayStatusSuccess extends TodayStatus {
@@ -149,6 +151,57 @@ export async function fetchTodayStatus(
     doubleScoreActive: Boolean(j.doubleScoreActive),
     proActive: Boolean(j.proActive),
     proExpiresAt: typeof j.proExpiresAt === 'string' ? j.proExpiresAt : null,
+    adsWatchedToday: Number(j.adsWatchedToday ?? 0),
+    adsMaxPerDay: Number(j.adsMaxPerDay ?? 0),
+  }
+}
+
+interface RecordAdRewardSuccess {
+  ok: true
+  allowed: boolean
+  watchedToday: number
+  maxPerDay: number
+}
+interface RecordAdRewardFailure {
+  ok: false
+  error: string
+}
+export type RecordAdRewardResult = RecordAdRewardSuccess | RecordAdRewardFailure
+
+export async function recordAdReward(
+  initData: string,
+): Promise<RecordAdRewardResult> {
+  const url = functionUrl('record-ad-reward')
+  const headers = functionHeaders()
+  if (!url || !headers) return { ok: false, error: 'env_missing' }
+
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ initData }),
+    })
+  } catch (e) {
+    return { ok: false, error: 'network' + (e ? `:${String(e)}` : '') }
+  }
+
+  let json: unknown
+  try {
+    json = await res.json()
+  } catch {
+    return { ok: false, error: 'bad_response' }
+  }
+
+  const j = (json ?? {}) as Record<string, unknown>
+  if (!res.ok || j.ok !== true) {
+    return { ok: false, error: (j.error as string) ?? 'http_error' }
+  }
+  return {
+    ok: true,
+    allowed: Boolean(j.allowed),
+    watchedToday: Number(j.watchedToday ?? 0),
+    maxPerDay: Number(j.maxPerDay ?? 0),
   }
 }
 

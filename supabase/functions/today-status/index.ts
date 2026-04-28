@@ -10,6 +10,8 @@
 //     doubleScoreActive: boolean,   // буст ×2 куплен на сегодня и не потрачен
 //     proActive: boolean,           // активна ли Word Pro подписка
 //     proExpiresAt: string | null,  // ISO-таймстамп истечения Pro (null если нет)
+//     adsWatchedToday: number,      // сколько rewarded ads уже смотрел сегодня
+//     adsMaxPerDay: number,         // дневной лимит (анти-чит)
 //   }
 //
 // Используется HomeScreen / ResultScreen / ShopScreen — для подсветки купленных
@@ -33,6 +35,8 @@ interface Body {
 }
 
 const DAILY_SEED_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Должно совпадать с MAX_ADS_PER_DAY в record-ad-reward.
+const ADS_MAX_PER_DAY = 3;
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -86,7 +90,7 @@ Deno.serve(async (req) => {
 
   const { data: meRow, error: meErr } = await supabase
     .from('users')
-    .select('id, replay_credits, double_score_date')
+    .select('id, replay_credits, double_score_date, ads_watched_date, ads_watched_count')
     .eq('telegram_id', verified.user.id)
     .maybeSingle();
   if (meErr) {
@@ -108,6 +112,8 @@ Deno.serve(async (req) => {
       doubleScoreActive: false,
       proActive: false,
       proExpiresAt: null,
+      adsWatchedToday: 0,
+      adsMaxPerDay: ADS_MAX_PER_DAY,
     });
   }
 
@@ -174,6 +180,12 @@ Deno.serve(async (req) => {
     ? Array.from(new Set([...ownedThemes, ...ALL_THEMES]))
     : ownedThemes;
 
+  const adsWatchedToday =
+    typeof meRow.ads_watched_date === 'string' &&
+    meRow.ads_watched_date === body.dailySeed
+      ? (meRow.ads_watched_count as number) ?? 0
+      : 0;
+
   return jsonResponse(200, {
     ok: true,
     playedToday,
@@ -184,5 +196,7 @@ Deno.serve(async (req) => {
     doubleScoreActive,
     proActive,
     proExpiresAt,
+    adsWatchedToday,
+    adsMaxPerDay: ADS_MAX_PER_DAY,
   });
 });

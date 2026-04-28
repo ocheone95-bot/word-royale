@@ -1,10 +1,16 @@
 // Игровой экран. Тап по тайлам собирает слово, Submit проверяет его в словаре,
 // валидное слово даёт очки и попадает в список найденных. Таймер появится дальше.
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useRawInitData } from '@telegram-apps/sdk-react'
 import { calculateScore } from '@word-royale/shared'
-import { useGameStore, type Feedback } from '../store/useGameStore'
+import {
+  REWARDED_AD_BONUS_SECONDS,
+  useGameStore,
+  type Feedback,
+} from '../store/useGameStore'
 import { useDictionary } from '../hooks/useDictionary'
+import { isMonetagAvailable } from '../lib/monetag'
 
 export default function GameScreen() {
   const { dict, error } = useDictionary()
@@ -16,8 +22,33 @@ export default function GameScreen() {
   const feedback = useGameStore((s) => s.feedback)
   const timeLeft = useGameStore((s) => s.timeLeft)
   const todayStatus = useGameStore((s) => s.todayStatus)
+  const watchRewardedAd = useGameStore((s) => s.watchRewardedAd)
   const doubleScoreActive =
     todayStatus.loaded && todayStatus.doubleScoreActive
+  const adsWatchedToday = todayStatus.loaded ? todayStatus.adsWatchedToday : 0
+  const adsMaxPerDay = todayStatus.loaded ? todayStatus.adsMaxPerDay : 0
+  const adsAvailableServer =
+    todayStatus.loaded && adsMaxPerDay > 0 && adsWatchedToday < adsMaxPerDay
+  const initData = useRawInitData()
+  const [adInProgress, setAdInProgress] = useState(false)
+  const [adError, setAdError] = useState<string | null>(null)
+  const adsAvailable =
+    isMonetagAvailable() && adsAvailableServer && timeLeft > 0
+
+  const handleWatchAd = async () => {
+    if (!initData || adInProgress) return
+    setAdInProgress(true)
+    setAdError(null)
+    const res = await watchRewardedAd(initData)
+    setAdInProgress(false)
+    if (!res.ok) {
+      setAdError(
+        res.reason === 'limit'
+          ? 'Daily ad limit reached.'
+          : 'Ad not available right now.',
+      )
+    }
+  }
   const goHome = useGameStore((s) => s.goHome)
   const toggleLetter = useGameStore((s) => s.toggleLetter)
   const clearSelection = useGameStore((s) => s.clearSelection)
@@ -102,6 +133,24 @@ export default function GameScreen() {
               Submit
             </button>
           </div>
+
+          {adsAvailable && (
+            <div className="mt-4 max-w-sm w-full">
+              <button
+                type="button"
+                onClick={handleWatchAd}
+                disabled={adInProgress}
+                className="w-full py-2 rounded-xl border border-amber-500/50 text-amber-300 text-sm active:scale-95 transition disabled:opacity-50"
+              >
+                {adInProgress
+                  ? 'Loading ad…'
+                  : `📺 Watch ad · +${REWARDED_AD_BONUS_SECONDS}s (${adsMaxPerDay - adsWatchedToday} left)`}
+              </button>
+              {adError && (
+                <p className="mt-1 text-[11px] text-rose-400 text-center">{adError}</p>
+              )}
+            </div>
+          )}
 
           <FoundWords words={foundWords} />
         </div>

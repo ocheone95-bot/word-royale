@@ -10,7 +10,8 @@ import {
   type DailySeed,
   type Letters,
 } from '@word-royale/shared'
-import { fetchTodayStatus, submitSession } from '../lib/api'
+import { fetchTodayStatus, recordAdReward, submitSession } from '../lib/api'
+import { showRewardedAd } from '../lib/monetag'
 
 export type Screen = 'home' | 'game' | 'result' | 'leaderboard' | 'shop'
 export type Feedback = null | 'success' | 'invalid' | 'duplicate' | 'too-short'
@@ -30,7 +31,11 @@ export type TodayStatusState =
       doubleScoreActive: boolean
       proActive: boolean
       proExpiresAt: string | null
+      adsWatchedToday: number
+      adsMaxPerDay: number
     }
+
+export const REWARDED_AD_BONUS_SECONDS = 30
 
 const SELECTED_THEME_KEY = 'wr.selectedTheme'
 
@@ -89,6 +94,8 @@ interface GameState {
   showShop: () => void
   startGame: () => void
   setSelectedTheme: (theme: ThemeId) => void
+  // Запускает Monetag rewarded-ad и +30s к таймеру при success.
+  watchRewardedAd: (initData: string) => Promise<{ ok: boolean; reason?: string }>
   toggleLetter: (index: number) => void
   clearSelection: () => void
   submitWord: (dict: Set<string>) => void
@@ -224,6 +231,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     const prevThemes = prevStatus.loaded ? prevStatus.themes : []
     const prevPro = prevStatus.loaded ? prevStatus.proActive : false
     const prevProExpires = prevStatus.loaded ? prevStatus.proExpiresAt : null
+    const prevAdsCount = prevStatus.loaded ? prevStatus.adsWatchedToday : 0
+    const prevAdsMax = prevStatus.loaded ? prevStatus.adsMaxPerDay : 0
     if (result.ok) {
       set({
         submitStatus: 'success',
@@ -241,6 +250,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           doubleScoreActive: false,
           proActive: prevPro,
           proExpiresAt: prevProExpires,
+          adsWatchedToday: prevAdsCount,
+          adsMaxPerDay: prevAdsMax,
         },
       })
     } else {
@@ -261,6 +272,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             doubleScoreActive: prevDouble,
             proActive: prevPro,
             proExpiresAt: prevProExpires,
+            adsWatchedToday: prevAdsCount,
+            adsMaxPerDay: prevAdsMax,
           },
         })
       } else {
@@ -287,7 +300,39 @@ export const useGameStore = create<GameState>((set, get) => ({
         doubleScoreActive: result.doubleScoreActive,
         proActive: result.proActive,
         proExpiresAt: result.proExpiresAt,
+        adsWatchedToday: result.adsWatchedToday,
+        adsMaxPerDay: result.adsMaxPerDay,
       },
     })
+  },
+
+  watchRewardedAd: async (initData) => {
+    const status = get().todayStatus
+    if (status.loaded && status.adsWatchedToday >= status.adsMaxPerDay) {
+      return { ok: false, reason: 'limit' }
+    }
+    const shown = await showRewardedAd()
+    if (!shown) return { ok: false, reason: 'ad_unavailable' }
+
+    // SDK подтвердил показ — фиксируем в БД и проверяем дневной лимит.
+    const recorded = await recordAdReward(initData)
+    if (!recorded.ok) return { ok: false, reason: recorded.error }
+    if (!recorded.allowed) return { ok: false, reason: 'limit' }
+
+    // Бонус: +30 сек к таймеру + обновляем счётчик в локальном состоянии.
+    const { timeLeft, screen } = get()
+    if (screen === 'game' && timeLeft > 0) {
+      set({ timeLeft: timeLeft + REWARDED_AD_BONUS_SECONDS })
+    }
+    if (status.loaded) {
+      set({
+        todayStatus: {
+          ...status,
+          adsWatchedToday: recorded.watchedToday,
+          adsMaxPerDay: recorded.maxPerDay,
+        },
+      })
+    }
+    return { ok: true }
   },
 }))
