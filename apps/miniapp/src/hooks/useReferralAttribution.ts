@@ -12,6 +12,7 @@ import { useEffect } from 'react'
 import { useRawInitData } from '@telegram-apps/sdk-react'
 import { recordReferral } from '../lib/api'
 import { parseReferralStartParam } from '../lib/share'
+import { track } from '../lib/analytics'
 
 const SESSION_KEY = 'wr.referralSent.v1'
 
@@ -30,7 +31,8 @@ export function useReferralAttribution(): void {
     if (!initData) return
     const startParam = readStartParam(initData)
     if (!startParam) return
-    if (parseReferralStartParam(startParam) == null) return
+    const referrerId = parseReferralStartParam(startParam)
+    if (referrerId == null) return
 
     try {
       if (sessionStorage.getItem(SESSION_KEY)) return
@@ -41,6 +43,7 @@ export function useReferralAttribution(): void {
       // sessionStorage может быть недоступен в эфемерных webview — едем без кэша.
     }
 
+    track('referral_attributed', { referrer_id: referrerId })
     void recordReferral(initData, startParam)
   }, [initData])
 }

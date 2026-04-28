@@ -1,7 +1,7 @@
 // Корневой компонент. Оборачивает HomeScreen в ErrorBoundary, чтобы
 // поймать ошибку SDK при запуске вне Telegram и показать понятный fallback.
 
-import { Component, type ReactNode } from 'react'
+import { Component, useEffect, type ReactNode } from 'react'
 import HomeScreen from './screens/HomeScreen'
 import GameScreen from './screens/GameScreen'
 import ResultScreen from './screens/ResultScreen'
@@ -9,6 +9,8 @@ import LeaderboardScreen from './screens/LeaderboardScreen'
 import ShopScreen from './screens/ShopScreen'
 import { useGameStore } from './store/useGameStore'
 import { useReferralAttribution } from './hooks/useReferralAttribution'
+import { useTelegramUser } from './hooks/useTelegramUser'
+import { identifyUser } from './lib/analytics'
 
 type State = { hasError: boolean }
 
@@ -55,10 +57,28 @@ function ReferralAttributor() {
   return null
 }
 
+// PostHog identify по telegram_id один раз за маунт. Без identify события
+// летят анонимно и (при person_profiles='identified_only') профиль не
+// создаётся — это сэкономит MAU-квоту.
+function AnalyticsIdentifier() {
+  const user = useTelegramUser()
+  useEffect(() => {
+    if (!user?.id) return
+    identifyUser(user.id, {
+      username: user.username ?? null,
+      first_name: user.firstName ?? null,
+      language_code: user.languageCode ?? null,
+      is_premium: user.isPremium ?? false,
+    })
+  }, [user?.id, user?.username, user?.firstName, user?.languageCode, user?.isPremium])
+  return null
+}
+
 export default function App() {
   return (
     <TelegramErrorBoundary>
       <ReferralAttributor />
+      <AnalyticsIdentifier />
       <ActiveScreen />
     </TelegramErrorBoundary>
   )

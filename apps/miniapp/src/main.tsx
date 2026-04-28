@@ -8,10 +8,14 @@ import { createRoot } from 'react-dom/client'
 import { init, isTMA } from '@telegram-apps/sdk-react'
 import './index.css'
 import App from './App.tsx'
+import { initAnalytics, track } from './lib/analytics.ts'
 
 if (isTMA()) {
   init()
 }
+
+initAnalytics()
+track('app_opened')
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

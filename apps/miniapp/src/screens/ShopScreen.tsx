@@ -13,6 +13,7 @@ import {
   buildBuyThemeDeepLink,
 } from '../lib/share'
 import { openTelegramLink } from '../lib/telegram'
+import { track } from '../lib/analytics'
 
 const REPLAY_PRICE_STARS = 50
 const THEME_PRICE_STARS = 100
@@ -41,6 +42,10 @@ export default function ShopScreen() {
   const setSelectedTheme = useGameStore((s) => s.setSelectedTheme)
 
   useEffect(() => {
+    track('shop_opened')
+  }, [])
+
+  useEffect(() => {
     if (!initData) return
     void refreshTodayStatus(initData)
     const onVisible = () => {
@@ -59,12 +64,22 @@ export default function ShopScreen() {
   const proActive = todayStatus.loaded && todayStatus.proActive
   const proExpiresAt = todayStatus.loaded ? todayStatus.proExpiresAt : null
 
-  const handleBuyReplay = () => openTelegramLink(buildBuyReplayDeepLink())
-  const handleBuyTheme = (id: ThemeId) =>
+  const handleBuyReplay = () => {
+    track('iap_initiated', { product_id: 'replay', price_stars: REPLAY_PRICE_STARS, source: 'shop' })
+    openTelegramLink(buildBuyReplayDeepLink())
+  }
+  const handleBuyTheme = (id: ThemeId) => {
+    track('iap_initiated', { product_id: `theme_${id}`, price_stars: THEME_PRICE_STARS, source: 'shop' })
     openTelegramLink(buildBuyThemeDeepLink(id))
-  const handleBuyDoubleScore = () =>
+  }
+  const handleBuyDoubleScore = () => {
+    track('iap_initiated', { product_id: 'double_score', price_stars: 200, source: 'shop' })
     openTelegramLink(buildBuyDeepLink('double_score'))
-  const handleBuyPro = () => openTelegramLink(buildBuyDeepLink('pro_subscription'))
+  }
+  const handleBuyPro = () => {
+    track('iap_initiated', { product_id: 'pro_subscription', price_stars: 150, source: 'shop' })
+    openTelegramLink(buildBuyDeepLink('pro_subscription'))
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 px-6 py-8 text-white">

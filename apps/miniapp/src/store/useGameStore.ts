@@ -12,6 +12,7 @@ import {
 } from '@word-royale/shared'
 import { fetchTodayStatus, recordAdReward, submitSession } from '../lib/api'
 import { showRewardedAd } from '../lib/monetag'
+import { track } from '../lib/analytics'
 
 export type Screen = 'home' | 'game' | 'result' | 'leaderboard' | 'shop'
 export type Feedback = null | 'success' | 'invalid' | 'duplicate' | 'too-short'
@@ -141,11 +142,22 @@ export const useGameStore = create<GameState>((set, get) => ({
     } catch {
       // не критично — следующая сессия откатится на default.
     }
+    track('theme_applied', { theme_id: theme })
     set({ selectedTheme: theme })
   },
 
   startGame: () => {
     const seed = getTodaySeed()
+    const status = get().todayStatus
+    track('game_started', {
+      seed,
+      is_replay: status.loaded ? status.playedToday : false,
+      replay_credits_before:
+        status.loaded ? status.replayCredits : null,
+      double_score_active:
+        status.loaded ? status.doubleScoreActive : false,
+      pro_active: status.loaded ? status.proActive : false,
+    })
     set({
       screen: 'game',
       seed,
@@ -192,9 +204,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ feedback: 'invalid', selectedIndices: [] })
       return
     }
+    const wordScore = calculateScore(word)
+    track('word_found', { word_length: word.length, word_score: wordScore })
     set({
       foundWords: [...foundWords, word],
-      score: score + calculateScore(word),
+      score: score + wordScore,
       selectedIndices: [],
       feedback: 'success',
     })
@@ -203,10 +217,20 @@ export const useGameStore = create<GameState>((set, get) => ({
   clearFeedback: () => set({ feedback: null }),
 
   tickTimer: () => {
-    const { timeLeft, screen } = get()
+    const { timeLeft, screen, score, foundWords, seed } = get()
     if (screen !== 'game' || timeLeft <= 0) return
     const next = timeLeft - 1
     if (next <= 0) {
+      const longest = foundWords.reduce(
+        (a, b) => (b.length > a.length ? b : a),
+        '',
+      )
+      track('game_completed', {
+        seed,
+        score,
+        words_count: foundWords.length,
+        longest_length: longest.length,
+      })
       set({ timeLeft: 0, screen: 'result', selectedIndices: [], feedback: null })
     } else {
       set({ timeLeft: next })
@@ -309,16 +333,32 @@ export const useGameStore = create<GameState>((set, get) => ({
   watchRewardedAd: async (initData) => {
     const status = get().todayStatus
     if (status.loaded && status.adsWatchedToday >= status.adsMaxPerDay) {
+      track('ad_watched', { result: 'limit' })
       return { ok: false, reason: 'limit' }
     }
     const shown = await showRewardedAd()
-    if (!shown) return { ok: false, reason: 'ad_unavailable' }
+    if (!shown) {
+      track('ad_watched', { result: 'unavailable' })
+      return { ok: false, reason: 'ad_unavailable' }
+    }
 
     // SDK подтвердил показ — фиксируем в БД (RPC атомарно инкрементит счётчик
     // ads и replay_credits, либо отказывает по лимиту).
     const recorded = await recordAdReward(initData)
-    if (!recorded.ok) return { ok: false, reason: recorded.error }
-    if (!recorded.allowed) return { ok: false, reason: 'limit' }
+    if (!recorded.ok) {
+      track('ad_watched', { result: 'record_failed', error: recorded.error })
+      return { ok: false, reason: recorded.error }
+    }
+    if (!recorded.allowed) {
+      track('ad_watched', { result: 'limit' })
+      return { ok: false, reason: 'limit' }
+    }
+
+    track('ad_watched', {
+      result: 'success',
+      watched_today: recorded.watchedToday,
+      replay_credits_after: recorded.replayCredits,
+    })
 
     // +1 replay_credit получен. Обновляем todayStatus, чтобы UI ResultScreen
     // тут же переключился с «Buy replay» на «Play replay (N)».

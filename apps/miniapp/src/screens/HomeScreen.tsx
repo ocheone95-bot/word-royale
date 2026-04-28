@@ -17,6 +17,7 @@ import {
   buildTelegramShareLink,
 } from '../lib/share'
 import { openTelegramLink } from '../lib/telegram'
+import { track } from '../lib/analytics'
 
 const REPLAY_PRICE_STARS = 50
 
@@ -45,11 +46,17 @@ export default function HomeScreen() {
   }, [initData, refreshTodayStatus])
 
   const handleInvite = () => {
+    track('invite_clicked')
     const url = buildPlayDeepLink(user?.id ?? null)
     openTelegramLink(buildTelegramShareLink(buildInviteText(), url))
   }
 
   const handleBuyReplay = () => {
+    track('iap_initiated', {
+      product_id: 'replay',
+      price_stars: REPLAY_PRICE_STARS,
+      source: 'home',
+    })
     openTelegramLink(buildBuyReplayDeepLink())
   }
 

@@ -15,6 +15,7 @@ import {
 } from '../lib/share'
 import { openTelegramLink } from '../lib/telegram'
 import { isMonetagAvailable } from '../lib/monetag'
+import { track } from '../lib/analytics'
 
 const REPLAY_PRICE_STARS = 50
 
@@ -89,7 +90,14 @@ export default function ResultScreen() {
     isMonetagAvailable() &&
     adsMaxPerDay > 0 &&
     adsWatchedToday < adsMaxPerDay
-  const handleBuyReplay = () => openTelegramLink(buildBuyReplayDeepLink())
+  const handleBuyReplay = () => {
+    track('iap_initiated', {
+      product_id: 'replay',
+      price_stars: REPLAY_PRICE_STARS,
+      source: 'result',
+    })
+    openTelegramLink(buildBuyReplayDeepLink())
+  }
   const handleWatchAd = async () => {
     if (!initData || adInProgress) return
     setAdInProgress(true)
@@ -114,6 +122,11 @@ export default function ResultScreen() {
   const canShare = submitStatus === 'success' || submitError === 'no_replay'
   const handleShare = () => {
     if (!canShare) return
+    track('share_clicked', {
+      score: displayScore,
+      words_count: foundWords.length,
+      seed,
+    })
     const text = buildShareText({
       seed,
       score: displayScore,
