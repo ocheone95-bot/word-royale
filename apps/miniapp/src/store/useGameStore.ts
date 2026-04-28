@@ -15,9 +15,43 @@ import { fetchTodayStatus, submitSession } from '../lib/api'
 export type Screen = 'home' | 'game' | 'result' | 'leaderboard' | 'shop'
 export type Feedback = null | 'success' | 'invalid' | 'duplicate' | 'too-short'
 export type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error'
+
+// 'default' — встроенная тема, бесплатна для всех. Остальные нужно купить.
+export const ALL_THEMES = ['default', 'neon', 'retro', 'sakura', 'cyberpunk'] as const
+export type ThemeId = (typeof ALL_THEMES)[number]
+
 export type TodayStatusState =
   | { loaded: false }
-  | { loaded: true; playedToday: boolean; replayCredits: number }
+  | {
+      loaded: true
+      playedToday: boolean
+      replayCredits: number
+      themes: string[]
+    }
+
+const SELECTED_THEME_KEY = 'wr.selectedTheme'
+
+function readSelectedThemeFromStorage(): ThemeId {
+  try {
+    const v = localStorage.getItem(SELECTED_THEME_KEY)
+    if (v && (ALL_THEMES as readonly string[]).includes(v)) {
+      return v as ThemeId
+    }
+  } catch {
+    // localStorage может быть недоступен — fallback на default.
+  }
+  return 'default'
+}
+
+function applyThemeToDom(theme: ThemeId): void {
+  if (typeof document === 'undefined') return
+  // 'default' — атрибут снимаем, чтобы CSS-переменные взялись из :root.
+  if (theme === 'default') {
+    document.documentElement.removeAttribute('data-theme')
+  } else {
+    document.documentElement.setAttribute('data-theme', theme)
+  }
+}
 
 export const GAME_DURATION_SECONDS = 90
 
@@ -41,10 +75,15 @@ interface GameState {
   // статус юзера на сегодня — играл ли уже и сколько replay-токенов
   todayStatus: TodayStatusState
 
+  // выбранная тема. Применяется к <html data-theme> через applyThemeToDom().
+  // Persist в localStorage, чтобы пережить ремаунт Mini App.
+  selectedTheme: ThemeId
+
   goHome: () => void
   showLeaderboard: () => void
   showShop: () => void
   startGame: () => void
+  setSelectedTheme: (theme: ThemeId) => void
   toggleLetter: (index: number) => void
   clearSelection: () => void
   submitWord: (dict: Set<string>) => void
@@ -55,6 +94,8 @@ interface GameState {
 }
 
 const todaySeed = getTodaySeed()
+const initialTheme = readSelectedThemeFromStorage()
+applyThemeToDom(initialTheme)
 
 export const useGameStore = create<GameState>((set, get) => ({
   screen: 'home',
@@ -72,11 +113,23 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   todayStatus: { loaded: false },
 
+  selectedTheme: initialTheme,
+
   goHome: () => set({ screen: 'home' }),
 
   showLeaderboard: () => set({ screen: 'leaderboard' }),
 
   showShop: () => set({ screen: 'shop' }),
+
+  setSelectedTheme: (theme) => {
+    applyThemeToDom(theme)
+    try {
+      localStorage.setItem(SELECTED_THEME_KEY, theme)
+    } catch {
+      // не критично — следующая сессия откатится на default.
+    }
+    set({ selectedTheme: theme })
+  },
 
   startGame: () => {
     const seed = getTodaySeed()
@@ -158,6 +211,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       score,
       durationSec: GAME_DURATION_SECONDS,
     })
+    // Сохраняем уже известный набор тем — submit-score его не возвращает,
+    // а перезатирать пустым массивом нельзя, иначе ShopScreen «забудет» owned.
+    const prevStatus = get().todayStatus
+    const prevThemes = prevStatus.loaded ? prevStatus.themes : []
     if (result.ok) {
       set({
         submitStatus: 'success',
@@ -169,6 +226,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           loaded: true,
           playedToday: true,
           replayCredits: result.replayCreditsLeft,
+          themes: prevThemes,
         },
       })
     } else {
@@ -179,7 +237,12 @@ export const useGameStore = create<GameState>((set, get) => ({
         set({
           submitStatus: 'error',
           submitError: result.error,
-          todayStatus: { loaded: true, playedToday: true, replayCredits: 0 },
+          todayStatus: {
+            loaded: true,
+            playedToday: true,
+            replayCredits: 0,
+            themes: prevThemes,
+          },
         })
       } else {
         set({ submitStatus: 'error', submitError: result.error })
@@ -201,6 +264,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         loaded: true,
         playedToday: result.playedToday,
         replayCredits: result.replayCredits,
+        themes: result.themes,
       },
     })
   },

@@ -1,22 +1,43 @@
-// Shop-экран. Показывает каталог IAP: replay-кредиты, темы, double score, Word Pro.
+// Shop-экран. Показывает каталог IAP: replay-кредиты, темы букв, double score, Word Pro.
 // Каждая позиция — карточка с названием, описанием, ценой и кнопкой Buy.
 // Покупка идёт через бот: deep-link `t.me/word_royale_bot?start=buy_<product>`,
 // бот шлёт Stars-инвойс. После оплаты юзер возвращается, today-status обновляется
-// на visibilitychange и кнопка переключается на «Owned» / «Active».
+// на visibilitychange и кнопка переключается на «Owned» / «Apply».
 
 import { useEffect } from 'react'
 import { useRawInitData } from '@telegram-apps/sdk-react'
-import { useGameStore } from '../store/useGameStore'
-import { buildBuyReplayDeepLink } from '../lib/share'
+import { useGameStore, type ThemeId } from '../store/useGameStore'
+import {
+  buildBuyReplayDeepLink,
+  buildBuyThemeDeepLink,
+} from '../lib/share'
 import { openTelegramLink } from '../lib/telegram'
 
 const REPLAY_PRICE_STARS = 50
+const THEME_PRICE_STARS = 100
+
+interface ThemeCatalogEntry {
+  id: ThemeId
+  title: string
+  description: string
+}
+
+// 'default' идёт первой — она бесплатна и активна по умолчанию.
+const THEME_CATALOG: readonly ThemeCatalogEntry[] = [
+  { id: 'default', title: 'Classic', description: 'The original purple style. Free for everyone.' },
+  { id: 'neon', title: 'Neon', description: 'Cyan glow letters on a dark canvas.' },
+  { id: 'retro', title: 'Retro', description: 'Warm sepia letters with a vintage feel.' },
+  { id: 'sakura', title: 'Sakura', description: 'Soft pink blossom palette.' },
+  { id: 'cyberpunk', title: 'Cyberpunk', description: 'Magenta + neon yellow contrast.' },
+] as const
 
 export default function ShopScreen() {
   const initData = useRawInitData()
   const goHome = useGameStore((s) => s.goHome)
   const todayStatus = useGameStore((s) => s.todayStatus)
   const refreshTodayStatus = useGameStore((s) => s.refreshTodayStatus)
+  const selectedTheme = useGameStore((s) => s.selectedTheme)
+  const setSelectedTheme = useGameStore((s) => s.setSelectedTheme)
 
   useEffect(() => {
     if (!initData) return
@@ -31,10 +52,11 @@ export default function ShopScreen() {
   }, [initData, refreshTodayStatus])
 
   const replayCredits = todayStatus.loaded ? todayStatus.replayCredits : 0
+  const ownedThemes = todayStatus.loaded ? todayStatus.themes : []
 
-  const handleBuyReplay = () => {
-    openTelegramLink(buildBuyReplayDeepLink())
-  }
+  const handleBuyReplay = () => openTelegramLink(buildBuyReplayDeepLink())
+  const handleBuyTheme = (id: ThemeId) =>
+    openTelegramLink(buildBuyThemeDeepLink(id))
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 px-6 py-8 text-white">
@@ -51,23 +73,35 @@ export default function ShopScreen() {
           <div className="w-10" />
         </div>
 
-        <div className="space-y-4">
+        <Section title="Replay">
           <ShopCard
-            title="Replay"
+            title="Extra game today"
             description="Play today's puzzle one more time."
             price={`${REPLAY_PRICE_STARS} ⭐`}
             badge={replayCredits > 0 ? `${replayCredits} owned` : null}
             onBuy={handleBuyReplay}
           />
+        </Section>
 
-          <ShopCard
-            title="Themes"
-            description="Neon, retro, sakura, cyberpunk letter styles."
-            price="100 ⭐"
-            disabled
-            disabledLabel="Coming soon"
-          />
+        <Section title="Themes">
+          <p className="text-xs text-slate-400 mb-3">
+            Letter style for the game board. Tap a theme you own to apply it.
+          </p>
+          <div className="space-y-3">
+            {THEME_CATALOG.map((theme) => (
+              <ThemeCard
+                key={theme.id}
+                theme={theme}
+                owned={theme.id === 'default' || ownedThemes.includes(theme.id)}
+                active={selectedTheme === theme.id}
+                onApply={() => setSelectedTheme(theme.id)}
+                onBuy={() => handleBuyTheme(theme.id)}
+              />
+            ))}
+          </div>
+        </Section>
 
+        <Section title="Boosts">
           <ShopCard
             title="Double Score"
             description="Multiply today's score by 2× on your next game."
@@ -75,7 +109,9 @@ export default function ShopScreen() {
             disabled
             disabledLabel="Coming soon"
           />
+        </Section>
 
+        <Section title="Subscription">
           <ShopCard
             title="Word Pro"
             description="Unlimited daily plays, all themes, no rate limit."
@@ -83,9 +119,26 @@ export default function ShopScreen() {
             disabled
             disabledLabel="Coming soon"
           />
-        </div>
+        </Section>
       </div>
     </main>
+  )
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="mb-6">
+      <h2 className="text-xs uppercase tracking-widest text-slate-400 mb-2">
+        {title}
+      </h2>
+      {children}
+    </section>
   )
 }
 
@@ -111,7 +164,7 @@ function ShopCard({
   return (
     <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
       <div className="flex items-start justify-between mb-2">
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <h3 className="text-lg font-semibold">{title}</h3>
         {badge && (
           <span className="text-xs bg-purple-600/30 text-purple-200 px-2 py-1 rounded-full">
             {badge}
@@ -131,6 +184,81 @@ function ShopCard({
       >
         {disabled ? (disabledLabel ?? 'Coming soon') : `Buy · ${price}`}
       </button>
+    </div>
+  )
+}
+
+interface ThemeCardProps {
+  theme: ThemeCatalogEntry
+  owned: boolean
+  active: boolean
+  onApply: () => void
+  onBuy: () => void
+}
+
+function ThemeCard({ theme, owned, active, onApply, onBuy }: ThemeCardProps) {
+  return (
+    <div
+      className={`bg-slate-800/60 border rounded-2xl p-4 ${
+        active ? 'border-purple-400' : 'border-slate-700'
+      }`}
+    >
+      <div className="flex items-center gap-3 mb-3">
+        <ThemePreview themeId={theme.id} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-semibold truncate">{theme.title}</h3>
+            {active && (
+              <span className="text-[10px] uppercase tracking-wider bg-purple-600/30 text-purple-200 px-2 py-0.5 rounded-full">
+                Active
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-400">{theme.description}</p>
+        </div>
+      </div>
+      {owned ? (
+        <button
+          type="button"
+          onClick={active ? undefined : onApply}
+          disabled={active}
+          className={
+            active
+              ? 'w-full bg-slate-700/50 text-slate-400 py-2 rounded-xl text-sm font-medium cursor-default'
+              : 'w-full border border-purple-500 text-purple-200 hover:bg-purple-500/10 active:scale-95 transition py-2 rounded-xl text-sm font-medium'
+          }
+        >
+          {active ? '✓ Applied' : 'Apply'}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onBuy}
+          className="w-full bg-amber-500 hover:bg-amber-400 active:scale-95 transition py-2 rounded-xl text-sm font-semibold text-slate-900"
+        >
+          Buy · {THEME_PRICE_STARS} ⭐
+        </button>
+      )}
+    </div>
+  )
+}
+
+// Маленький preview-тайл темы. Рендерит мини-LetterTile с CSS-переменными
+// конкретной темы — даём юзеру понять стиль, не применяя его на весь экран.
+function ThemePreview({ themeId }: { themeId: ThemeId }) {
+  const themeAttr = themeId === 'default' ? undefined : { 'data-theme': themeId }
+  return (
+    <div
+      {...themeAttr}
+      className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold border"
+      style={{
+        background: 'var(--tile-bg-selected)',
+        borderColor: 'var(--tile-border-selected)',
+        color: 'var(--tile-text-selected)',
+        boxShadow: '0 4px 8px -2px var(--tile-shadow-selected)',
+      }}
+    >
+      A
     </div>
   )
 }

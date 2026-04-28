@@ -45,3 +45,30 @@ export async function grantReplayCredit(params: {
   const row = data[0] as { user_id: string; was_new: boolean };
   return { userId: row.user_id, wasNew: row.was_new };
 }
+
+// Атомарно: upsert юзера + запись в purchases + idempotent insert в user_themes.
+// Возвращает was_new=false, если этот telegram_payment_id уже обрабатывался.
+export async function grantTheme(params: {
+  telegramId: number;
+  username: string | null;
+  firstName: string | null;
+  themeId: string;
+  telegramPaymentId: string;
+  starsAmount: number;
+}): Promise<{ userId: string; wasNew: boolean }> {
+  const { data, error } = await getSupabase().rpc('grant_theme', {
+    p_telegram_id: params.telegramId,
+    p_username: params.username,
+    p_first_name: params.firstName,
+    p_theme_id: params.themeId,
+    p_telegram_payment_id: params.telegramPaymentId,
+    p_stars_amount: params.starsAmount,
+  });
+
+  if (error) throw error;
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('grant_theme returned no row');
+  }
+  const row = data[0] as { user_id: string; was_new: boolean };
+  return { userId: row.user_id, wasNew: row.was_new };
+}

@@ -6,10 +6,11 @@
 //     playedToday: boolean,         // есть ли non-replay сессия на сегодня
 //     replayCredits: number,        // купленных и неиспользованных
 //     freeGameAvailable: boolean,   // !playedToday — удобство для UI
+//     themes: string[],             // theme_id-шки купленных тем
 //   }
 //
-// Используется HomeScreen / ResultScreen чтобы показать «Buy replay» вместо
-// «Play», если юзер уже играл и кредитов нет.
+// Используется HomeScreen / ResultScreen / ShopScreen — для подсветки купленных
+// тем, оставшихся replay-токенов и состояния «Buy replay» vs «Play replay».
 //
 // Аутентификация — initData HMAC, как в submit-score / friends-leaderboard.
 
@@ -93,22 +94,27 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Юзер ещё не появлялся — соответственно, ничего не играл и кредитов нет.
+  // Юзер ещё не появлялся — соответственно, ничего не играл, кредитов и тем нет.
   if (!meRow) {
     return jsonResponse(200, {
       ok: true,
       playedToday: false,
       replayCredits: 0,
       freeGameAvailable: true,
+      themes: [],
     });
   }
 
-  const { count, error: countErr } = await supabase
-    .from('game_sessions')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', meRow.id)
-    .eq('daily_seed', body.dailySeed)
-    .eq('was_replay', false);
+  const [{ count, error: countErr }, { data: themesRows, error: themesErr }] =
+    await Promise.all([
+      supabase
+        .from('game_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', meRow.id)
+        .eq('daily_seed', body.dailySeed)
+        .eq('was_replay', false),
+      supabase.from('user_themes').select('theme_id').eq('user_id', meRow.id),
+    ]);
   if (countErr) {
     return jsonResponse(500, {
       ok: false,
@@ -116,12 +122,21 @@ Deno.serve(async (req) => {
       detail: countErr.message,
     });
   }
+  if (themesErr) {
+    return jsonResponse(500, {
+      ok: false,
+      error: 'themes_lookup_failed',
+      detail: themesErr.message,
+    });
+  }
 
   const playedToday = (count ?? 0) > 0;
+  const themes = (themesRows ?? []).map((r) => r.theme_id as string);
   return jsonResponse(200, {
     ok: true,
     playedToday,
     replayCredits: meRow.replay_credits as number,
     freeGameAvailable: !playedToday,
+    themes,
   });
 });

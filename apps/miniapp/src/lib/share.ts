@@ -34,10 +34,18 @@ export function buildPlayDeepLink(referrerTelegramId: number | null): string {
   return `${base}?startapp=ref_${referrerTelegramId}`
 }
 
-// Deep-link на бот, который при /start payload=buy_replay сразу шлёт Stars-инвойс
-// на 50 ⭐ за повторную игру (бот-handler в apps/bot/src/handlers/start.ts).
+// Deep-link на бот, который при /start payload=buy_<product> сразу шлёт
+// Stars-инвойс на этот продукт (бот-handler в apps/bot/src/handlers/start.ts).
+export function buildBuyDeepLink(productId: string): string {
+  return `https://t.me/${BOT_USERNAME}?start=buy_${productId}`
+}
+
 export function buildBuyReplayDeepLink(): string {
-  return `https://t.me/${BOT_USERNAME}?start=buy_replay`
+  return buildBuyDeepLink('replay')
+}
+
+export function buildBuyThemeDeepLink(themeId: string): string {
+  return buildBuyDeepLink(`theme_${themeId}`)
 }
 
 export function buildTelegramShareLink(text: string, url: string): string {

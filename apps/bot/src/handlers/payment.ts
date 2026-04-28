@@ -7,9 +7,13 @@
 //      не зачислится).
 
 import type { Bot } from 'grammy';
-import { getProduct } from '../products.js';
+import {
+  getProduct,
+  isThemeProductId,
+  themeIdFromProductId,
+} from '../products.js';
 import { parseInvoicePayload } from './buy.js';
-import { grantReplayCredit } from '../supabase.js';
+import { grantReplayCredit, grantTheme } from '../supabase.js';
 
 export function registerPaymentHandlers(bot: Bot): void {
   bot.on('pre_checkout_query', async (ctx) => {
@@ -64,38 +68,49 @@ export function registerPaymentHandlers(bot: Bot): void {
       return;
     }
 
-    if (parsed.productId !== 'replay') {
-      console.error('successful_payment for unknown product', parsed.productId);
-      return;
-    }
+    const grantBase = {
+      telegramId: from.id,
+      username: from.username ?? null,
+      firstName: from.first_name ?? null,
+      telegramPaymentId: payment.telegram_payment_charge_id,
+      starsAmount: payment.total_amount,
+    };
+
+    let wasNew: boolean;
+    let successText: string;
 
     try {
-      const result = await grantReplayCredit({
-        telegramId: from.id,
-        username: from.username ?? null,
-        firstName: from.first_name ?? null,
-        telegramPaymentId: payment.telegram_payment_charge_id,
-        starsAmount: payment.total_amount,
-      });
-
-      if (!result.wasNew) {
-        // Дубль webhook — товар уже зачислен, юзеру второе сообщение не шлём.
+      if (parsed.productId === 'replay') {
+        const result = await grantReplayCredit(grantBase);
+        wasNew = result.wasNew;
+        successText =
+          '✅ Payment received! You got *1 extra game today* — open Word Royale and play again.';
+      } else if (isThemeProductId(parsed.productId)) {
+        const themeId = themeIdFromProductId(parsed.productId);
+        const product = getProduct(parsed.productId);
+        const result = await grantTheme({ ...grantBase, themeId });
+        wasNew = result.wasNew;
+        successText = `✅ Payment received! *${product.title}* unlocked — open Word Royale and apply it from Shop.`;
+      } else {
+        console.error('successful_payment for unknown product', parsed.productId);
         return;
       }
     } catch (err) {
-      console.error('grant_replay_credit failed', err);
+      console.error('grant_*  failed', err);
       // Даже если запись в БД упала, деньги уже списаны. Лучше сообщить юзеру
       // что что-то пошло не так, чем молчать.
       await ctx.reply(
-        '⚠️ Payment received but we hit an issue crediting your replay. ' +
-          'Please contact support — your purchase is safe.',
+        '⚠️ Payment received but we hit an issue applying your purchase. ' +
+          'Please contact support — your payment is safe.',
       );
       return;
     }
 
-    await ctx.reply(
-      '✅ Payment received! You got *1 extra game today* — open Word Royale and play again.',
-      { parse_mode: 'Markdown' },
-    );
+    if (!wasNew) {
+      // Дубль webhook — товар уже зачислен, юзеру второе сообщение не шлём.
+      return;
+    }
+
+    await ctx.reply(successText, { parse_mode: 'Markdown' });
   });
 }

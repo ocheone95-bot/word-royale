@@ -173,19 +173,36 @@ function LetterTile({
   onClick: () => void
 }) {
   const selected = order !== -1
+  // Цвета и тени берутся из CSS-переменных, заданных активной темой в index.css.
+  // Поэтому смена темы перекрашивает тайлы без переключения React-кода.
+  const style: React.CSSProperties = selected
+    ? {
+        background: 'var(--tile-bg-selected)',
+        borderColor: 'var(--tile-border-selected)',
+        boxShadow: '0 10px 15px -3px var(--tile-shadow-selected)',
+        color: 'var(--tile-text-selected)',
+      }
+    : {
+        background: 'var(--tile-bg)',
+        borderColor: 'var(--tile-border)',
+        boxShadow: '0 10px 15px -3px var(--tile-shadow)',
+        color: 'var(--tile-text)',
+      }
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`relative aspect-square flex items-center justify-center rounded-2xl text-3xl font-bold uppercase shadow-lg transition active:scale-95 ${
-        selected
-          ? 'bg-purple-600 border-2 border-purple-300 shadow-purple-700/50'
-          : 'bg-slate-800/70 border border-purple-500/30 shadow-purple-900/30'
+      style={style}
+      className={`relative aspect-square flex items-center justify-center rounded-2xl text-3xl font-bold uppercase transition active:scale-95 ${
+        selected ? 'border-2' : 'border'
       }`}
     >
       {letter}
       {selected && (
-        <span className="absolute top-1 right-1 text-[10px] font-mono text-purple-200">
+        <span
+          className="absolute top-1 right-1 text-[10px] font-mono"
+          style={{ color: 'var(--tile-order)' }}
+        >
           {order + 1}
         </span>
       )}

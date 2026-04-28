@@ -3,7 +3,13 @@
 // в pre_checkout_query и successful_payment, по нему мы понимаем кто и что купил.
 
 import type { Bot, Context } from 'grammy';
-import { PRODUCTS, isProductId, type ProductId } from '../products.js';
+import {
+  PRODUCTS,
+  THEME_IDS,
+  getProduct,
+  isProductId,
+  type ProductId,
+} from '../products.js';
 
 // Формат: <productId>:<telegramUserId>:<nonce>
 // nonce защищает от случайного дубля одного и того же payload в БД, если Telegram
@@ -30,9 +36,12 @@ export function parseInvoicePayload(payload: string): ParsedPayload | null {
   return { productId: productIdRaw, telegramUserId };
 }
 
-// Шлёт invoice для replay-продукта в текущий чат. Используется и из команды
-// /buy_replay, и из /start buy_replay (deep-link из Mini App).
-export async function sendReplayInvoice(ctx: Context): Promise<void> {
+// Шлёт invoice для произвольного продукта в текущий чат. Используется и из
+// команд /buy_<product>, и из /start buy_<product> (deep-link из Mini App).
+export async function sendProductInvoice(
+  ctx: Context,
+  productId: ProductId,
+): Promise<void> {
   const userId = ctx.from?.id;
   const chatId = ctx.chat?.id;
   if (!userId || !chatId) {
@@ -40,7 +49,7 @@ export async function sendReplayInvoice(ctx: Context): Promise<void> {
     return;
   }
 
-  const product = PRODUCTS.replay;
+  const product = getProduct(productId);
 
   await ctx.replyWithInvoice(
     product.title,
@@ -53,6 +62,15 @@ export async function sendReplayInvoice(ctx: Context): Promise<void> {
   );
 }
 
+export async function sendReplayInvoice(ctx: Context): Promise<void> {
+  await sendProductInvoice(ctx, 'replay');
+}
+
 export function registerBuyHandlers(bot: Bot): void {
   bot.command('buy_replay', sendReplayInvoice);
+  for (const themeId of THEME_IDS) {
+    const productId: ProductId = `theme_${themeId}`;
+    // Дефис в названии команды Telegram не допускает, поэтому /buy_theme_neon.
+    bot.command(`buy_theme_${themeId}`, (ctx) => sendProductInvoice(ctx, productId));
+  }
 }

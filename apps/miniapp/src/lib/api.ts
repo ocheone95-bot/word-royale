@@ -93,6 +93,7 @@ export interface TodayStatus {
   playedToday: boolean
   replayCredits: number
   freeGameAvailable: boolean
+  themes: string[]
 }
 
 interface TodayStatusSuccess extends TodayStatus {
@@ -140,6 +141,7 @@ export async function fetchTodayStatus(
     playedToday: Boolean(j.playedToday),
     replayCredits: Number(j.replayCredits ?? 0),
     freeGameAvailable: Boolean(j.freeGameAvailable),
+    themes: Array.isArray(j.themes) ? (j.themes as string[]) : [],
   }
 }
 
