@@ -13,6 +13,7 @@ import {
 import { fetchTodayStatus, recordAdReward, submitSession } from '../lib/api'
 import { showRewardedAd } from '../lib/monetag'
 import { track } from '../lib/analytics'
+import { captureMessage } from '../lib/sentry'
 
 export type Screen = 'home' | 'game' | 'result' | 'leaderboard' | 'shop'
 export type Feedback = null | 'success' | 'invalid' | 'duplicate' | 'too-short'
@@ -301,6 +302,15 @@ export const useGameStore = create<GameState>((set, get) => ({
           },
         })
       } else {
+        // network/env_missing — ожидаемые для мобильного, остальное — настоящая
+        // серверная аномалия (seed_mismatch, score_mismatch, words_not_in_dictionary,
+        // bad_response): шлём в Sentry, чтобы понимать частоту.
+        if (result.error !== 'network' && result.error !== 'env_missing') {
+          captureMessage('submit-score failed', {
+            error: result.error,
+            status: (result as { status?: number }).status ?? null,
+          })
+        }
         set({ submitStatus: 'error', submitError: result.error })
       }
     }
@@ -312,7 +322,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!result.ok) {
       // Молчаливо: статус — это UX-подсказка, ошибка не должна ломать экран.
       // В худшем случае юзер попробует Play и получит no_replay из submit-score.
-      console.warn('today-status failed', result.error)
+      if (!result.error.startsWith('network')) {
+        captureMessage('today-status failed', { error: result.error })
+      }
       return
     }
     set({

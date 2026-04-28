@@ -9,11 +9,13 @@ import { init, isTMA } from '@telegram-apps/sdk-react'
 import './index.css'
 import App from './App.tsx'
 import { initAnalytics, track } from './lib/analytics.ts'
+import { initSentry } from './lib/sentry.ts'
 
 if (isTMA()) {
   init()
 }
 
+initSentry()
 initAnalytics()
 track('app_opened')
 

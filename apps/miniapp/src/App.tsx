@@ -11,6 +11,7 @@ import { useGameStore } from './store/useGameStore'
 import { useReferralAttribution } from './hooks/useReferralAttribution'
 import { useTelegramUser } from './hooks/useTelegramUser'
 import { identifyUser } from './lib/analytics'
+import { captureError, setSentryUser } from './lib/sentry'
 
 type State = { hasError: boolean }
 
@@ -19,6 +20,13 @@ class TelegramErrorBoundary extends Component<{ children: ReactNode }, State> {
 
   static getDerivedStateFromError(): State {
     return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, info: { componentStack?: string | null }) {
+    // SDK-исключения вне TMA (LaunchParamsRetrieveError) ожидаемы — Sentry
+    // их не игнорирует автоматически, но «Open in Telegram» fallback убирает
+    // их из критичных. Ловим всё подряд, фильтрацию делаем в Sentry-проекте.
+    captureError(error, { componentStack: info.componentStack ?? null })
   }
 
   render() {
@@ -57,7 +65,7 @@ function ReferralAttributor() {
   return null
 }
 
-// PostHog identify по telegram_id один раз за маунт. Без identify события
+// PostHog identify + Sentry user — один раз за маунт. Без identify события
 // летят анонимно и (при person_profiles='identified_only') профиль не
 // создаётся — это сэкономит MAU-квоту.
 function AnalyticsIdentifier() {
@@ -69,6 +77,10 @@ function AnalyticsIdentifier() {
       first_name: user.firstName ?? null,
       language_code: user.languageCode ?? null,
       is_premium: user.isPremium ?? false,
+    })
+    setSentryUser(user.id, {
+      username: user.username ?? null,
+      firstName: user.firstName ?? null,
     })
   }, [user?.id, user?.username, user?.firstName, user?.languageCode, user?.isPremium])
   return null
