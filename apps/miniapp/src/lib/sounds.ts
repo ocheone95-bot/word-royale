@@ -6,6 +6,10 @@
 // Состояние on/off держим в localStorage `wr.soundEnabled` (default: on).
 // Любой системный сбой (нет AudioContext, отказ resume, ошибка осциллятора)
 // проглатывается — звук это nice-to-have, не должен ломать игру.
+//
+// Sound toggle также управляет фоновой chiptune-музыкой из lib/music.ts.
+
+import { startMusic, stopMusic, isMusicPlaying } from './music'
 
 type SfxKind = 'tap' | 'success' | 'fail' | 'tick'
 
@@ -36,6 +40,13 @@ export function setSoundEnabled(enabled: boolean): void {
   } catch {
     // не критично — переживёт ремаунт через cached state.
   }
+  // Toggle на UI — это user-gesture, тут можно запускать BGM сразу.
+  // При выключении — гасим, при включении — стартуем (если ещё не).
+  if (enabled) {
+    startMusic()
+  } else {
+    stopMusic()
+  }
 }
 
 interface AudioContextCtor {
@@ -58,6 +69,12 @@ function getCtx(): AudioContext | null {
     return null
   }
   return ctx
+}
+
+// Шаринг AudioContext с lib/music.ts. Один контекст на всё приложение —
+// экономит ресурсы и обходит политику autoplay через одно user-gesture.
+export function getSharedAudioContext(): AudioContext | null {
+  return getCtx()
 }
 
 interface ToneSpec {
@@ -121,6 +138,10 @@ export function playSfx(kind: SfxKind): void {
         now + spec.follow.delayMs / 1000,
       )
     }
+    // Первый sfx = первое user-gesture, в это окно можно поднять BGM
+    // (если она не играет и звук включён). Toggle уже сам стартует music
+    // напрямую — этот путь покрывает юзеров, которые не трогали toggle.
+    if (!isMusicPlaying()) startMusic()
   } catch {
     // ignore
   }
