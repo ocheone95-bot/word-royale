@@ -6,6 +6,7 @@ import HomeScreen from './screens/HomeScreen'
 import GameScreen from './screens/GameScreen'
 import ResultScreen from './screens/ResultScreen'
 import LeaderboardScreen from './screens/LeaderboardScreen'
+import ShopScreen from './screens/ShopScreen'
 import { useGameStore } from './store/useGameStore'
 import { useReferralAttribution } from './hooks/useReferralAttribution'
 
@@ -42,6 +43,7 @@ function ActiveScreen() {
   if (screen === 'game') return <GameScreen />
   if (screen === 'result') return <ResultScreen />
   if (screen === 'leaderboard') return <LeaderboardScreen />
+  if (screen === 'shop') return <ShopScreen />
   return <HomeScreen />
 }
 

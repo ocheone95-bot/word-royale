@@ -25,6 +25,7 @@ export default function HomeScreen() {
   const initData = useRawInitData()
   const startGame = useGameStore((s) => s.startGame)
   const showLeaderboard = useGameStore((s) => s.showLeaderboard)
+  const showShop = useGameStore((s) => s.showShop)
   const todayStatus = useGameStore((s) => s.todayStatus)
   const refreshTodayStatus = useGameStore((s) => s.refreshTodayStatus)
   const greeting = user?.firstName ? `Hello, ${user.firstName}!` : 'Hello!'
@@ -104,6 +105,13 @@ export default function HomeScreen() {
           className="w-full border border-slate-600 text-slate-200 active:scale-95 transition py-3 rounded-2xl text-base mb-3"
         >
           Leaderboard
+        </button>
+        <button
+          type="button"
+          onClick={showShop}
+          className="w-full border border-slate-600 text-slate-200 active:scale-95 transition py-3 rounded-2xl text-base mb-3"
+        >
+          🛒 Shop
         </button>
         <button
           type="button"

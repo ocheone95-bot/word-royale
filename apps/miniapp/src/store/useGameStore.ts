@@ -12,7 +12,7 @@ import {
 } from '@word-royale/shared'
 import { fetchTodayStatus, submitSession } from '../lib/api'
 
-export type Screen = 'home' | 'game' | 'result' | 'leaderboard'
+export type Screen = 'home' | 'game' | 'result' | 'leaderboard' | 'shop'
 export type Feedback = null | 'success' | 'invalid' | 'duplicate' | 'too-short'
 export type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error'
 export type TodayStatusState =
@@ -43,6 +43,7 @@ interface GameState {
 
   goHome: () => void
   showLeaderboard: () => void
+  showShop: () => void
   startGame: () => void
   toggleLetter: (index: number) => void
   clearSelection: () => void
@@ -74,6 +75,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   goHome: () => set({ screen: 'home' }),
 
   showLeaderboard: () => set({ screen: 'leaderboard' }),
+
+  showShop: () => set({ screen: 'shop' }),
 
   startGame: () => {
     const seed = getTodaySeed()
