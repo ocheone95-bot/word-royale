@@ -18,6 +18,7 @@ import {
   grantProSubscription,
   grantReplayCredit,
   grantTheme,
+  revokePurchase,
 } from '../supabase.js';
 
 export function registerPaymentHandlers(bot: Bot): void {
@@ -129,5 +130,52 @@ export function registerPaymentHandlers(bot: Bot): void {
     }
 
     await ctx.reply(successText, { parse_mode: 'Markdown' });
+  });
+
+  // Stars refund (юзер вернул через Telegram support в течение 90 дней).
+  // Telegram шлёт нам service-message с payload оригинального платежа.
+  // Унвидим благо через revoke_purchase (идемпотентно по telegram_payment_id).
+  bot.on('message:refunded_payment', async (ctx) => {
+    const refund = ctx.message.refunded_payment;
+    const from = ctx.from;
+    if (!from) {
+      console.error('refunded_payment without ctx.from');
+      return;
+    }
+
+    try {
+      const result = await revokePurchase({
+        telegramPaymentId: refund.telegram_payment_charge_id,
+        telegramUserId: from.id,
+      });
+
+      if (!result.ok) {
+        // Платёж не записан или mismatch — ничего не откатили.
+        // Если ok=false и productId не null — был mismatch, логируем.
+        if (result.productId) {
+          console.error(
+            'revoke_purchase mismatch — refund for foreign payment?',
+            { paymentId: refund.telegram_payment_charge_id, telegramId: from.id },
+          );
+        }
+        // Юзер всё равно получит Stars обратно от Telegram, мы тут только
+        // отвязываем благо. Сообщать ему нечего.
+        return;
+      }
+
+      if (result.wasAlreadyRefunded) {
+        // Дубль service-message — уже отозвали при предыдущем хите.
+        return;
+      }
+
+      // Шлём подтверждение, чтобы юзер видел — мы знаем про refund.
+      // Текст краткий, Telegram сам показывает банковское подтверждение возврата.
+      await ctx.reply(
+        '↩️ Refund processed. The purchase has been revoked from your account.',
+      );
+    } catch (err) {
+      console.error('revoke_purchase failed', err);
+      // Stars уже вернулись юзеру, мы ничего сделать не можем — только лог.
+    }
   });
 }

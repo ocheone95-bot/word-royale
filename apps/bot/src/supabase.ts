@@ -105,6 +105,38 @@ export async function grantDoubleScore(params: {
   return { userId: row.user_id, wasNew: row.was_new };
 }
 
+// Атомарно откатывает покупку при Stars-refund (Telegram даёт юзерам 90 дней
+// на возврат). Унвид по product_id внутри RPC; здесь только тонкая обёртка.
+// Возвращает product_id (для лога) или null если платёж не был записан.
+export async function revokePurchase(params: {
+  telegramPaymentId: string;
+  telegramUserId: number;
+}): Promise<{
+  ok: boolean;
+  productId: string | null;
+  wasAlreadyRefunded: boolean;
+}> {
+  const { data, error } = await getSupabase().rpc('revoke_purchase', {
+    p_telegram_payment_id: params.telegramPaymentId,
+    p_telegram_user_id: params.telegramUserId,
+  });
+
+  if (error) throw error;
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('revoke_purchase returned no row');
+  }
+  const row = data[0] as {
+    ok: boolean;
+    product_id: string | null;
+    was_already_refunded: boolean;
+  };
+  return {
+    ok: row.ok,
+    productId: row.product_id,
+    wasAlreadyRefunded: row.was_already_refunded,
+  };
+}
+
 // Атомарно: upsert юзера + запись в purchases + idempotent insert в user_themes.
 // Возвращает was_new=false, если этот telegram_payment_id уже обрабатывался.
 export async function grantTheme(params: {
