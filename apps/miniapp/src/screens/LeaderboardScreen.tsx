@@ -38,6 +38,7 @@ function entryName(e: LeaderboardEntry): string {
 export default function LeaderboardScreen() {
   const goHome = useGameStore((s) => s.goHome)
   const showShop = useGameStore((s) => s.showShop)
+  const showMe = useGameStore((s) => s.showMe)
   const tgUser = useTelegramUser()
   const initData = useRawInitData()
   const [mode, setMode] = useState<Mode>('friends')
@@ -103,6 +104,7 @@ export default function LeaderboardScreen() {
     hapticImpact('light')
     if (key === 'home') goHome()
     else if (key === 'shop') showShop()
+    else if (key === 'me') showMe()
   }
 
   return (

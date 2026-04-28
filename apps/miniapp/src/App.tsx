@@ -7,6 +7,7 @@ import GameScreen from './screens/GameScreen'
 import ResultScreen from './screens/ResultScreen'
 import LeaderboardScreen from './screens/LeaderboardScreen'
 import ShopScreen from './screens/ShopScreen'
+import MeScreen from './screens/MeScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import { useGameStore } from './store/useGameStore'
 import { useReferralAttribution } from './hooks/useReferralAttribution'
@@ -64,7 +65,9 @@ function ActiveScreen() {
           ? LeaderboardScreen
           : screen === 'shop'
             ? ShopScreen
-            : HomeScreen
+            : screen === 'me'
+              ? MeScreen
+              : HomeScreen
   // key={screen} принудительно ремаунтит wrapper при смене экрана —
   // CSS-анимация screen-fade проигрывается на mount каждого нового экрана.
   return (

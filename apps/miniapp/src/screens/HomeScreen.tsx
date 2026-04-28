@@ -76,6 +76,7 @@ export default function HomeScreen() {
   const startGame = useGameStore((s) => s.startGame)
   const showLeaderboard = useGameStore((s) => s.showLeaderboard)
   const showShop = useGameStore((s) => s.showShop)
+  const showMe = useGameStore((s) => s.showMe)
   const todayStatus = useGameStore((s) => s.todayStatus)
   const refreshTodayStatus = useGameStore((s) => s.refreshTodayStatus)
   const seed = useGameStore((s) => s.seed)
@@ -140,7 +141,7 @@ export default function HomeScreen() {
     hapticImpact('light')
     if (key === 'board') showLeaderboard()
     else if (key === 'shop') showShop()
-    // 'me' — пока нет Settings/Profile экрана, no-op.
+    else if (key === 'me') showMe()
   }
 
   const day = dayNumberSinceLaunch(seed)

@@ -126,6 +126,7 @@ export default function ShopScreen() {
   const initData = useRawInitData()
   const goHome = useGameStore((s) => s.goHome)
   const showLeaderboard = useGameStore((s) => s.showLeaderboard)
+  const showMe = useGameStore((s) => s.showMe)
   const todayStatus = useGameStore((s) => s.todayStatus)
   const refreshTodayStatus = useGameStore((s) => s.refreshTodayStatus)
   const selectedTheme = useGameStore((s) => s.selectedTheme)
@@ -202,7 +203,7 @@ export default function ShopScreen() {
     hapticImpact('light')
     if (key === 'home') goHome()
     else if (key === 'board') showLeaderboard()
-    // 'me' — пока нет Settings/Profile, no-op.
+    else if (key === 'me') showMe()
   }
 
   return (

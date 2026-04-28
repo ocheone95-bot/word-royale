@@ -17,7 +17,7 @@ import { captureMessage } from '../lib/sentry'
 import { hapticImpact, hapticNotify, hapticSelection } from '../lib/haptics'
 import { playSfx } from '../lib/sounds'
 
-export type Screen = 'home' | 'game' | 'result' | 'leaderboard' | 'shop'
+export type Screen = 'home' | 'game' | 'result' | 'leaderboard' | 'shop' | 'me'
 export type Feedback = null | 'success' | 'invalid' | 'duplicate' | 'too-short'
 export type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error'
 
@@ -107,6 +107,7 @@ interface GameState {
   goHome: () => void
   showLeaderboard: () => void
   showShop: () => void
+  showMe: () => void
   startGame: () => void
   setSelectedTheme: (theme: ThemeId) => void
   // Запускает Monetag rewarded-ad → +1 replay_credit при success.
@@ -149,6 +150,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   showLeaderboard: () => set({ screen: 'leaderboard' }),
 
   showShop: () => set({ screen: 'shop' }),
+
+  showMe: () => set({ screen: 'me' }),
 
   setSelectedTheme: (theme) => {
     applyThemeToDom(theme)
