@@ -10,6 +10,7 @@ import {
   isProductId,
   type ProductId,
 } from '../products.js';
+import { posthog } from '../posthog.js';
 
 // Формат: <productId>:<telegramUserId>:<nonce>
 // nonce защищает от случайного дубля одного и того же payload в БД, если Telegram
@@ -50,6 +51,16 @@ export async function sendProductInvoice(
   }
 
   const product = getProduct(productId);
+
+  posthog.capture({
+    distinctId: String(userId),
+    event: 'invoice_sent',
+    properties: {
+      product_id: product.id,
+      product_title: product.title,
+      stars_amount: product.starsAmount,
+    },
+  });
 
   await ctx.replyWithInvoice(
     product.title,

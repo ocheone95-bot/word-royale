@@ -6,6 +6,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { webhookCallback } from 'grammy';
 import { createBot } from '../src/bot.js';
+import { posthog } from '../src/posthog.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
@@ -20,4 +21,5 @@ const handle = webhookCallback(bot, 'http', {
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   await handle(req, res);
+  await posthog.shutdown();
 }

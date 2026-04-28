@@ -20,6 +20,7 @@ import {
   grantTheme,
   revokePurchase,
 } from '../supabase.js';
+import { posthog } from '../posthog.js';
 
 export function registerPaymentHandlers(bot: Bot): void {
   bot.on('pre_checkout_query', async (ctx) => {
@@ -27,6 +28,11 @@ export function registerPaymentHandlers(bot: Bot): void {
 
     const parsed = parseInvoicePayload(q.invoice_payload);
     if (!parsed) {
+      posthog.capture({
+        distinctId: String(q.from.id),
+        event: 'payment_checkout_rejected',
+        properties: { reason: 'invalid_payload' },
+      });
       await ctx.answerPreCheckoutQuery(false, {
         error_message: 'Invalid order. Please try again.',
       });
@@ -34,6 +40,11 @@ export function registerPaymentHandlers(bot: Bot): void {
     }
 
     if (parsed.telegramUserId !== q.from.id) {
+      posthog.capture({
+        distinctId: String(q.from.id),
+        event: 'payment_checkout_rejected',
+        properties: { reason: 'user_mismatch', product_id: parsed.productId },
+      });
       await ctx.answerPreCheckoutQuery(false, {
         error_message: 'Order does not match your account. Please try again.',
       });
@@ -41,6 +52,11 @@ export function registerPaymentHandlers(bot: Bot): void {
     }
 
     if (q.currency !== 'XTR') {
+      posthog.capture({
+        distinctId: String(q.from.id),
+        event: 'payment_checkout_rejected',
+        properties: { reason: 'unsupported_currency', currency: q.currency, product_id: parsed.productId },
+      });
       await ctx.answerPreCheckoutQuery(false, {
         error_message: 'Unsupported currency.',
       });
@@ -49,6 +65,11 @@ export function registerPaymentHandlers(bot: Bot): void {
 
     const product = getProduct(parsed.productId);
     if (q.total_amount !== product.starsAmount) {
+      posthog.capture({
+        distinctId: String(q.from.id),
+        event: 'payment_checkout_rejected',
+        properties: { reason: 'price_mismatch', product_id: parsed.productId, expected_stars: product.starsAmount, actual_stars: q.total_amount },
+      });
       await ctx.answerPreCheckoutQuery(false, {
         error_message: 'Price changed. Please try again.',
       });
@@ -115,6 +136,19 @@ export function registerPaymentHandlers(bot: Bot): void {
       }
     } catch (err) {
       console.error('grant_*  failed', err);
+      posthog.capture({
+        distinctId: String(from.id),
+        event: 'grant_failed',
+        properties: {
+          product_id: parsed.productId,
+          stars_amount: payment.total_amount,
+          telegram_payment_id: payment.telegram_payment_charge_id,
+        },
+      });
+      posthog.captureException(err, String(from.id), {
+        product_id: parsed.productId,
+        telegram_payment_id: payment.telegram_payment_charge_id,
+      });
       // Даже если запись в БД упала, деньги уже списаны. Лучше сообщить юзеру
       // что что-то пошло не так, чем молчать.
       await ctx.reply(
@@ -128,6 +162,20 @@ export function registerPaymentHandlers(bot: Bot): void {
       // Дубль webhook — товар уже зачислен, юзеру второе сообщение не шлём.
       return;
     }
+
+    posthog.capture({
+      distinctId: String(from.id),
+      event: 'payment_completed',
+      properties: {
+        product_id: parsed.productId,
+        stars_amount: payment.total_amount,
+        telegram_payment_id: payment.telegram_payment_charge_id,
+        $set: {
+          username: from.username ?? null,
+          first_name: from.first_name ?? null,
+        },
+      },
+    });
 
     await ctx.reply(successText, { parse_mode: 'Markdown' });
   });
@@ -168,6 +216,15 @@ export function registerPaymentHandlers(bot: Bot): void {
         return;
       }
 
+      posthog.capture({
+        distinctId: String(from.id),
+        event: 'payment_refunded',
+        properties: {
+          product_id: result.productId,
+          telegram_payment_id: refund.telegram_payment_charge_id,
+        },
+      });
+
       // Шлём подтверждение, чтобы юзер видел — мы знаем про refund.
       // Текст краткий, Telegram сам показывает банковское подтверждение возврата.
       await ctx.reply(
@@ -175,6 +232,9 @@ export function registerPaymentHandlers(bot: Bot): void {
       );
     } catch (err) {
       console.error('revoke_purchase failed', err);
+      posthog.captureException(err, String(from.id), {
+        telegram_payment_id: refund.telegram_payment_charge_id,
+      });
       // Stars уже вернулись юзеру, мы ничего сделать не можем — только лог.
     }
   });
