@@ -557,7 +557,7 @@ function EmptyState({ mode, onInvite }: { mode: Mode; onInvite: () => void }) {
         other's Friends leaderboard.
       </p>
       <SaloonButton variant="primary" size="sm" onClick={onInvite}>
-        📤 Invite friends
+        Invite friends
       </SaloonButton>
     </div>
   )

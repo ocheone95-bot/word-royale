@@ -296,7 +296,7 @@ export default function ResultScreen() {
           onClick={handleShare}
           disabled={!canShare}
         >
-          📤 Share result
+          Share result
         </SaloonButton>
         <div style={{ display: 'flex', gap: 10 }}>
           <SaloonButton
@@ -341,7 +341,7 @@ export default function ResultScreen() {
           >
             {adInProgress
               ? 'Loading ad…'
-              : `📺 Watch ad → free replay (${adsMaxPerDay - adsWatchedToday} left)`}
+              : `Watch ad → free replay (${adsMaxPerDay - adsWatchedToday} left)`}
           </SaloonButton>
         )}
         {adError && (

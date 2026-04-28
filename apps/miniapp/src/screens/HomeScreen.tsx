@@ -306,28 +306,22 @@ export default function HomeScreen() {
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: 6,
+          gap: 10,
           marginTop: 18,
           alignItems: 'center',
         }}
       >
-        <button
-          type="button"
+        <SaloonButton
+          variant="secondary"
+          size="sm"
           onClick={handleInvite}
           style={{
-            background: 'transparent',
-            border: 'none',
+            borderColor: 'var(--accent-brass)',
             color: 'var(--accent-brass-hi)',
-            fontFamily: 'var(--font-ui)',
-            fontSize: 13,
-            fontWeight: 700,
-            padding: '6px 12px',
-            cursor: 'pointer',
-            WebkitTapHighlightColor: 'transparent',
           }}
         >
           Invite friends
-        </button>
+        </SaloonButton>
         <button
           type="button"
           onClick={handleToggleSound}
@@ -336,14 +330,16 @@ export default function HomeScreen() {
             background: 'transparent',
             border: 'none',
             color: 'var(--text-ash)',
-            fontFamily: 'var(--font-ui)',
-            fontSize: 11,
+            fontFamily: 'var(--font-pixel)',
+            fontSize: 10,
+            letterSpacing: 1.5,
+            textTransform: 'uppercase',
             padding: '4px 8px',
             cursor: 'pointer',
             WebkitTapHighlightColor: 'transparent',
           }}
         >
-          {soundOn ? '🔊 Sound on' : '🔇 Sound off'}
+          Sound · {soundOn ? 'On' : 'Off'}
         </button>
       </div>
 
