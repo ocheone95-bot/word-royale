@@ -26,8 +26,37 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-function buildPrizeMessage(rank: number, prizeType: string): string {
-  // Без эмоджи — pixel-spade ♠ + ♛ как в проекте.
+type Lang = 'en' | 'ru';
+
+function resolveLang(input: string | null): Lang {
+  if (input === 'ru') return 'ru';
+  return 'en';
+}
+
+function buildPrizeMessage(
+  rank: number,
+  prizeType: string,
+  lang: Lang,
+): string {
+  if (lang === 'ru') {
+    if (prizeType === 'pro_30d') {
+      return [
+        `♛ Топ-${rank} на этой неделе`,
+        '',
+        'Приз: 30 дней Word Pro — безлимит реплеев + все темы.',
+        'Уже зачислено на твой аккаунт.',
+      ].join('\n');
+    }
+    if (prizeType === 'replay_credits_5') {
+      return [
+        `♠ Топ-${rank} на этой неделе`,
+        '',
+        'Приз: 5 бесплатных реплеев — уже зачислены.',
+        'Новый турнир уже стартовал. Защити место.',
+      ].join('\n');
+    }
+    return `Топ-${rank} на этой неделе — приз выдан.`;
+  }
   if (prizeType === 'pro_30d') {
     return [
       `♛ Top-${rank} this week`,
@@ -47,10 +76,15 @@ function buildPrizeMessage(rank: number, prizeType: string): string {
   return `Top-${rank} this week — prize granted.`;
 }
 
+function buildPlayButton(lang: Lang): string {
+  return lang === 'ru' ? '▶️ Играть' : '▶️ Play now';
+}
+
 async function sendTelegramMessage(
   botToken: string,
   chatId: number,
   text: string,
+  buttonText: string,
 ): Promise<{ ok: boolean; status?: number; description?: string }> {
   const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
   let res: Response;
@@ -63,7 +97,7 @@ async function sendTelegramMessage(
         text,
         reply_markup: {
           inline_keyboard: [
-            [{ text: '▶️ Play now', web_app: { url: MINI_APP_URL } }],
+            [{ text: buttonText, web_app: { url: MINI_APP_URL } }],
           ],
         },
       }),
@@ -168,13 +202,20 @@ Deno.serve(async (req) => {
     type Rec = {
       user_id: string;
       telegram_id: number;
+      language_code: string | null;
       rank: number;
       prize_type: string;
     };
     const list = (recipients ?? []) as Rec[];
     for (const r of list) {
-      const text = buildPrizeMessage(r.rank, r.prize_type);
-      const result = await sendTelegramMessage(botToken, r.telegram_id, text);
+      const lang = resolveLang(r.language_code);
+      const text = buildPrizeMessage(r.rank, r.prize_type, lang);
+      const result = await sendTelegramMessage(
+        botToken,
+        r.telegram_id,
+        text,
+        buildPlayButton(lang),
+      );
       if (result.ok) {
         dmSent += 1;
       } else {

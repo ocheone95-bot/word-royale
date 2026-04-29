@@ -31,6 +31,9 @@ export interface SubmitSessionPayload {
   // Минуты от UTC, положительный для Восточных. Сервер пишет в users.tz_offset_min,
   // используется daily-reminder для поиска юзеров с локальным 09:00.
   tzOffsetMin?: number
+  // Текущий язык интерфейса юзера ('en' | 'ru'). Сервер пишет в users.language_code,
+  // используется daily-reminder и weekly-prize-distribution для выбора локали DM.
+  languageCode?: string
 }
 
 // streakReward возможные значения:

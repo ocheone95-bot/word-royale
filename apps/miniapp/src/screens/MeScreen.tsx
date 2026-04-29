@@ -24,12 +24,13 @@ import {
   TabBar,
   type TabKey,
 } from '../components/saloon'
+import { getLang, setLang, t, tPlural, useLang, type Lang } from '../lib/i18n'
 
-function formatProExpiry(iso: string | null): string {
+function formatProExpiry(iso: string | null, lang: Lang): string {
   if (!iso) return '—'
   try {
     const d = new Date(iso)
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -40,6 +41,7 @@ function formatProExpiry(iso: string | null): string {
 }
 
 export default function MeScreen() {
+  const lang = useLang()
   const initData = useRawInitData()
   const tgUser = useTelegramUser()
   const goHome = useGameStore((s) => s.goHome)
@@ -126,7 +128,7 @@ export default function MeScreen() {
 
   const displayName =
     tgUser?.firstName ||
-    (tgUser?.username ? `@${tgUser.username}` : 'Player')
+    (tgUser?.username ? `@${tgUser.username}` : t('me.player_fallback'))
   const usernameLine = tgUser?.username ? `@${tgUser.username}` : null
   const mostacchioPose = proActive ? 'pro' : 'smile'
 
@@ -177,7 +179,7 @@ export default function MeScreen() {
             margin: 0,
           }}
         >
-          Profile
+          {t('me.title')}
         </h1>
         <span style={{ width: 30 }} />
       </header>
@@ -229,42 +231,42 @@ export default function MeScreen() {
         </div>
       </Card>
 
-      <SectionTitle>Today</SectionTitle>
+      <SectionTitle>{t('me.section_today')}</SectionTitle>
       <Card surface="table" padding={4}>
         <StatRow
-          label="Today's puzzle"
-          value={playedToday ? 'Played' : 'Not yet'}
+          label={t('me.todays_puzzle')}
+          value={playedToday ? t('me.played') : t('me.not_yet')}
           highlight={!playedToday}
         />
         <StatRow
-          label="Replay credits"
+          label={t('me.replay_credits')}
           value={String(replayCredits)}
           highlight={replayCredits > 0}
         />
         <StatRow
-          label="Double score boost"
-          value={doubleScoreActive ? 'Active' : '—'}
+          label={t('me.double_score_boost')}
+          value={doubleScoreActive ? t('me.active') : t('me.dash')}
           highlight={doubleScoreActive}
         />
         <StatRow
-          label="Watch ads"
+          label={t('me.watch_ads')}
           value={
             adsMaxPerDay > 0
               ? `${adsWatchedToday} / ${adsMaxPerDay}`
-              : '—'
+              : t('me.dash')
           }
           divider={false}
         />
       </Card>
 
-      <SectionTitle>This week</SectionTitle>
+      <SectionTitle>{t('me.section_thisweek')}</SectionTitle>
       <Card surface="table" padding={4}>
         <StatRow
-          label="Tournament rank"
+          label={t('me.tournament_rank')}
           value={
             todayStatus.loaded && todayStatus.weeklyRank !== null
               ? `#${todayStatus.weeklyRank}`
-              : '—'
+              : t('me.dash')
           }
           highlight={
             todayStatus.loaded &&
@@ -273,38 +275,44 @@ export default function MeScreen() {
           }
         />
         <StatRow
-          label="Total score"
+          label={t('me.total_score')}
           value={
             todayStatus.loaded && todayStatus.weeklyTotalScore !== null
               ? todayStatus.weeklyTotalScore.toLocaleString()
-              : '—'
+              : t('me.dash')
           }
           divider={false}
         />
       </Card>
 
-      <SectionTitle>Membership</SectionTitle>
+      <SectionTitle>{t('me.section_membership')}</SectionTitle>
       <Card surface="table" padding={4}>
         <StatRow
-          label="Word Pro"
+          label={t('me.word_pro')}
           value={
             proTrialActive
-              ? `Trial · until ${formatProExpiry(proExpiresAt)}`
+              ? t('me.trial_until', {
+                  date: formatProExpiry(proExpiresAt, lang),
+                })
               : proActive
-                ? `Until ${formatProExpiry(proExpiresAt)}`
-                : 'Free tier'
+                ? t('me.until', { date: formatProExpiry(proExpiresAt, lang) })
+                : t('me.free_tier')
           }
           highlight={proActive}
         />
         <StatRow
-          label="Themes owned"
-          value={proActive ? 'All (Pro)' : `${themesOwned} / 4`}
+          label={t('me.themes_owned')}
+          value={
+            proActive
+              ? t('me.themes_all_pro')
+              : t('me.themes_count', { n: themesOwned })
+          }
           highlight={themesOwned > 0 || proActive}
           divider={false}
         />
       </Card>
 
-      <SectionTitle>All-time</SectionTitle>
+      <SectionTitle>{t('me.section_alltime')}</SectionTitle>
       <Card surface="table" padding={4}>
         {statsState.kind === 'loading' && (
           <p
@@ -315,7 +323,7 @@ export default function MeScreen() {
               color: 'var(--text-parchment-dim)',
             }}
           >
-            Loading…
+            {t('common.loading')}
           </p>
         )}
         {statsState.kind === 'error' && (
@@ -327,56 +335,52 @@ export default function MeScreen() {
               color: 'var(--text-ash)',
             }}
           >
-            Could not load stats.
+            {t('me.could_not_load_stats')}
           </p>
         )}
         {statsState.kind === 'loaded' && (
           <>
             <StatRow
-              label="Best score"
+              label={t('me.best_score')}
               value={statsState.stats.bestScore.toLocaleString()}
               highlight={statsState.stats.bestScore > 0}
             />
             <StatRow
-              label="Games played"
+              label={t('me.games_played')}
               value={String(statsState.stats.totalGames)}
             />
             <StatRow
-              label="Days played"
+              label={t('me.days_played')}
               value={String(statsState.stats.daysPlayed)}
             />
             <StatRow
-              label="Current streak"
+              label={t('me.current_streak')}
               value={
                 statsState.stats.currentStreak === 0
-                  ? '—'
-                  : `${statsState.stats.currentStreak} day${
-                      statsState.stats.currentStreak === 1 ? '' : 's'
-                    }`
+                  ? t('me.dash')
+                  : tPlural('me.day', statsState.stats.currentStreak)
               }
               highlight={statsState.stats.currentStreak >= 2}
             />
             <StatRow
-              label="Best streak"
+              label={t('me.best_streak')}
               value={
                 statsState.stats.bestStreak === 0
-                  ? '—'
-                  : `${statsState.stats.bestStreak} day${
-                      statsState.stats.bestStreak === 1 ? '' : 's'
-                    }`
+                  ? t('me.dash')
+                  : tPlural('me.day', statsState.stats.bestStreak)
               }
               highlight={statsState.stats.bestStreak >= 3}
             />
             <StatRow
-              label="Words found"
+              label={t('me.words_found')}
               value={statsState.stats.totalWordsFound.toLocaleString()}
             />
             <StatRow
-              label="Longest word"
+              label={t('me.longest_word')}
               value={
                 statsState.stats.longestWord
                   ? statsState.stats.longestWord.toUpperCase()
-                  : '—'
+                  : t('me.dash')
               }
               highlight={
                 !!statsState.stats.longestWord &&
@@ -386,6 +390,34 @@ export default function MeScreen() {
             />
           </>
         )}
+      </Card>
+
+      <SectionTitle>{t('me.section_language')}</SectionTitle>
+      <Card surface="table" padding={10}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <LangSegment
+            active={lang === 'en'}
+            onClick={() => {
+              if (getLang() !== 'en') {
+                hapticImpact('light')
+                setLang('en')
+              }
+            }}
+          >
+            English
+          </LangSegment>
+          <LangSegment
+            active={lang === 'ru'}
+            onClick={() => {
+              if (getLang() !== 'ru') {
+                hapticImpact('light')
+                setLang('ru')
+              }
+            }}
+          >
+            Русский
+          </LangSegment>
+        </div>
       </Card>
 
       <div
@@ -401,7 +433,7 @@ export default function MeScreen() {
           onClick={handleOpenShop}
           style={{ flex: 1 }}
         >
-          Open shop
+          {t('me.open_shop')}
         </SaloonButton>
         <SaloonButton
           variant="secondary"
@@ -409,7 +441,7 @@ export default function MeScreen() {
           onClick={handleOpenLeaderboard}
           style={{ flex: 1 }}
         >
-          Leaderboard
+          {t('me.leaderboard')}
         </SaloonButton>
       </div>
 
@@ -420,7 +452,7 @@ export default function MeScreen() {
           fullWidth
           onClick={handleSendFeedback}
         >
-          Send feedback
+          {t('me.send_feedback')}
         </SaloonButton>
       </div>
 
@@ -456,6 +488,40 @@ function SectionTitle({ children }: { children: string }) {
     >
       {children}
     </h2>
+  )
+}
+
+function LangSegment({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        flex: 1,
+        background: active ? 'var(--accent-lamp)' : 'var(--bg-leather)',
+        color: active ? 'var(--text-charcoal)' : 'var(--text-parchment-dim)',
+        border: '1px solid rgba(212,168,73,0.3)',
+        padding: '10px 14px',
+        borderRadius: 10,
+        fontFamily: 'var(--font-ui)',
+        fontWeight: 800,
+        fontSize: 13,
+        cursor: 'pointer',
+        boxShadow: active ? '0 0 12px rgba(255,140,66,0.5)' : 'none',
+        WebkitTapHighlightColor: 'transparent',
+        transition: 'background 120ms ease-out',
+      }}
+    >
+      {children}
+    </button>
   )
 }
 

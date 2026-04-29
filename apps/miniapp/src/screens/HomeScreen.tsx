@@ -24,6 +24,7 @@ import { useViewportWidth } from '../hooks/useViewportWidth'
 import { useDayRollover } from '../hooks/useDayRollover'
 import { Mostaccio } from '../components/Mostaccio'
 import { PixelLogo } from '../components/PixelLogo'
+import { t, tPlural, useLang } from '../lib/i18n'
 import {
   Card,
   LetterTile,
@@ -36,11 +37,19 @@ import {
 
 const REPLAY_PRICE_STARS = 50
 
+const WEEKDAY_KEYS = [
+  'weekday.SUNDAY',
+  'weekday.MONDAY',
+  'weekday.TUESDAY',
+  'weekday.WEDNESDAY',
+  'weekday.THURSDAY',
+  'weekday.FRIDAY',
+  'weekday.SATURDAY',
+] as const
+
 function weekdayLabel(seed: string): string {
   const d = new Date(seed + 'T00:00:00Z')
-  return d
-    .toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })
-    .toUpperCase()
+  return t(WEEKDAY_KEYS[d.getUTCDay()])
 }
 
 function useTimeUntilMidnightUTC(): string {
@@ -60,10 +69,14 @@ function buildLabel(): string {
   const totalMin = Math.max(0, Math.floor(ms / 60_000))
   const h = Math.floor(totalMin / 60)
   const m = totalMin % 60
-  return `${h}h ${m.toString().padStart(2, '0')}m left`
+  return t('time.h_m_left', {
+    h,
+    m: m.toString().padStart(2, '0'),
+  })
 }
 
 export default function HomeScreen() {
+  useLang()
   const user = useTelegramUser()
   const initData = useRawInitData()
   const startGame = useGameStore((s) => s.startGame)
@@ -109,13 +122,13 @@ export default function HomeScreen() {
     adsWatchedToday < adsMaxPerDay
   const playLabel = proActive
     ? playedToday
-      ? '▶ Play another'
-      : '▶ Play'
+      ? t('home.play_another')
+      : t('home.play')
     : !playedToday
-      ? '▶ Play'
+      ? t('home.play')
       : replayCredits > 0
-        ? `▶ Play replay (${replayCredits})`
-        : '▶ Play'
+        ? t('home.play_replay', { n: replayCredits })
+        : t('home.play')
 
   const handlePlay = () => {
     hapticImpact('medium')
@@ -139,9 +152,7 @@ export default function HomeScreen() {
     setAdInProgress(false)
     if (!res.ok) {
       setAdError(
-        res.reason === 'limit'
-          ? 'Daily ad limit reached.'
-          : 'Ad not available right now.',
+        res.reason === 'limit' ? t('home.ad_limit') : t('home.ad_unavailable'),
       )
     }
   }
@@ -230,7 +241,7 @@ export default function HomeScreen() {
             }}
           >
             <SpeakerIcon on={soundOn} />
-            {soundOn ? 'On' : 'Off'}
+            {soundOn ? t('home.sound_on') : t('home.sound_off')}
           </button>
         </div>
       </header>
@@ -262,7 +273,7 @@ export default function HomeScreen() {
             textTransform: 'uppercase',
           }}
         >
-          Day {day} · {weekdayLabel(seed)}
+          {t('home.day_label', { n: day, weekday: weekdayLabel(seed) })}
         </p>
       </div>
 
@@ -286,7 +297,9 @@ export default function HomeScreen() {
             textTransform: 'uppercase',
           }}
         >
-          {user?.firstName ? `Hi, ${user.firstName}` : "Today's puzzle"}
+          {user?.firstName
+            ? t('home.greeting', { name: user.firstName })
+            : t('home.todays_puzzle')}
         </div>
         <div
           style={{
@@ -306,7 +319,7 @@ export default function HomeScreen() {
               lineHeight: 1.1,
             }}
           >
-            The Saloon
+            {t('home.saloon_title')}
           </h2>
           <span
             style={{
@@ -342,7 +355,7 @@ export default function HomeScreen() {
               fullWidth
               onClick={handleBuyReplay}
             >
-              Buy replay · {REPLAY_PRICE_STARS} ⭐
+              {t('home.buy_replay', { price: REPLAY_PRICE_STARS })}
             </SaloonButton>
             {adReplayAvailable && (
               <SaloonButton
@@ -352,7 +365,7 @@ export default function HomeScreen() {
                 onClick={handleWatchAd}
                 disabled={adInProgress}
               >
-                {adInProgress ? 'Loading ad…' : 'Watch ad → free replay'}
+                {adInProgress ? t('home.ad_loading') : t('home.watch_ad')}
               </SaloonButton>
             )}
           </div>
@@ -385,10 +398,9 @@ export default function HomeScreen() {
             textAlign: 'center',
           }}
         >
-          You already played today.{' '}
           {replayCredits > 0
-            ? `${replayCredits} replay${replayCredits === 1 ? '' : 's'} ready.`
-            : 'Buy a replay or watch an ad to play again.'}
+            ? tPlural('home.played_today_credits', replayCredits)
+            : t('home.played_today_no_credits')}
         </p>
       )}
 
@@ -421,7 +433,7 @@ export default function HomeScreen() {
             color: 'var(--accent-brass-hi)',
           }}
         >
-          Invite friends
+          {t('home.invite_friends')}
         </SaloonButton>
       </div>
 
@@ -468,14 +480,12 @@ function WeeklyRankStrip({
     const totalMin = Math.floor(ms / 60_000)
     const days = Math.floor(totalMin / (24 * 60))
     const hours = Math.floor((totalMin - days * 24 * 60) / 60)
-    if (days >= 1) return `${days}d ${hours}h left`
-    return `${hours}h left`
+    if (days >= 1) return t('time.d_h_left', { d: days, h: hours })
+    return t('time.h_left', { h: hours })
   })()
 
   const prizeHint =
-    rank <= 10
-      ? 'Top-10 · 30d Pro on Sun'
-      : 'Top-100 · 5 free replays on Sun'
+    rank <= 10 ? t('home.weekly_prize_top10') : t('home.weekly_prize_top100')
 
   return (
     <button
@@ -513,7 +523,7 @@ function WeeklyRankStrip({
               letterSpacing: 0.4,
             }}
           >
-            ♛ You're #{rank} this week
+            {t(rank <= 10 ? 'home.weekly_rank_top10' : 'home.weekly_rank_top100', { n: rank })}
           </span>
           <span
             style={{
@@ -558,10 +568,10 @@ function ProTrialPill({ expiresAt }: { expiresAt: string | null }) {
   const m = totalMin % 60
   const label =
     totalMin <= 0
-      ? 'expiring'
+      ? t('time.expiring')
       : h > 0
-        ? `${h}h ${m.toString().padStart(2, '0')}m left`
-        : `${m}m left`
+        ? t('time.h_m_left', { h, m: m.toString().padStart(2, '0') })
+        : t('time.h_m_left', { h: 0, m: m.toString().padStart(2, '0') })
   return (
     <span
       style={{
@@ -583,7 +593,7 @@ function ProTrialPill({ expiresAt }: { expiresAt: string | null }) {
       }}
     >
       <span style={{ color: 'var(--accent-lamp)' }}>♛</span>
-      Pro trial · {label}
+      {t('badge.pro_trial', { time: label })}
     </span>
   )
 }

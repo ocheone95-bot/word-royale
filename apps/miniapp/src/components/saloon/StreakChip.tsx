@@ -3,6 +3,7 @@
 // border, leather background, лёгкий glow.
 
 import type { CSSProperties } from 'react'
+import { plural, t } from '../../lib/i18n'
 
 interface StreakChipProps {
   days: number
@@ -34,11 +35,19 @@ export function StreakChip({ days, className, style }: StreakChipProps) {
     textShadow: '0 0 6px rgba(212,168,73,0.5)',
     fontVariantNumeric: 'tabular-nums',
   }
+  const form = plural(days, { one: 'one', few: 'few', other: 'other' })
+  const tail = t(
+    form === 'one'
+      ? 'badge.streak_tail_one'
+      : form === 'few'
+        ? 'badge.streak_tail_few'
+        : 'badge.streak_tail_other',
+  )
   return (
     <span className={className} style={wrap}>
       <span style={{ color: 'var(--accent-brass)', fontSize: 12 }}>♠</span>
       <span style={numStyle}>{days}</span>
-      <span>day{days === 1 ? '' : 's'} streak</span>
+      <span>{tail}</span>
     </span>
   )
 }

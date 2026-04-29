@@ -23,6 +23,7 @@ import { openTelegramLink } from '../lib/telegram'
 import { hapticImpact } from '../lib/haptics'
 import { useDayRollover } from '../hooks/useDayRollover'
 import { Card, SaloonButton, TabBar, type TabKey } from '../components/saloon'
+import { t, useLang } from '../lib/i18n'
 
 type Mode = 'friends' | 'global' | 'week'
 
@@ -51,7 +52,7 @@ interface WeekMeta {
 function entryName(e: UiEntry): string {
   return (
     e.firstName ||
-    (e.username ? `@${e.username}` : `Player ${e.telegramId}`)
+    (e.username ? `@${e.username}` : `${t('me.player_fallback')} ${e.telegramId}`)
   )
 }
 
@@ -98,11 +99,12 @@ function timeUntilWeekEnd(weekEnd: string): string {
   const totalMin = Math.floor(remaining / 60000)
   const days = Math.floor(totalMin / (24 * 60))
   const hours = Math.floor((totalMin - days * 24 * 60) / 60)
-  if (days >= 1) return `${days}d ${hours}h left`
-  return `${hours}h left`
+  if (days >= 1) return t('time.d_h_left', { d: days, h: hours })
+  return t('time.h_left', { h: hours })
 }
 
 export default function LeaderboardScreen() {
+  useLang()
   const goHome = useGameStore((s) => s.goHome)
   const showShop = useGameStore((s) => s.showShop)
   const showMe = useGameStore((s) => s.showMe)
@@ -267,7 +269,7 @@ export default function LeaderboardScreen() {
             margin: 0,
           }}
         >
-          Leaderboard
+          {t('lb.title')}
         </h1>
         <span
           style={{
@@ -296,19 +298,19 @@ export default function LeaderboardScreen() {
           active={mode === 'friends'}
           onClick={() => handleSetMode('friends')}
         >
-          Friends
+          {t('lb.friends')}
         </ToggleSegment>
         <ToggleSegment
           active={mode === 'global'}
           onClick={() => handleSetMode('global')}
         >
-          Global
+          {t('lb.global')}
         </ToggleSegment>
         <ToggleSegment
           active={mode === 'week'}
           onClick={() => handleSetMode('week')}
         >
-          Week
+          {t('lb.week')}
         </ToggleSegment>
       </div>
 
@@ -325,7 +327,7 @@ export default function LeaderboardScreen() {
             fontSize: 13,
           }}
         >
-          Loading…
+          {t('common.loading')}
         </p>
       )}
 
@@ -338,7 +340,7 @@ export default function LeaderboardScreen() {
             fontSize: 13,
           }}
         >
-          Could not load the leaderboard.
+          {t('lb.could_not_load')}
         </p>
       )}
 
@@ -444,7 +446,7 @@ function WeekBanner({ meta }: { meta: WeekMeta }) {
               color: 'var(--accent-brass)',
             }}
           >
-            ♛ Tournament prizes
+            {t('lb.tournament_prizes')}
           </span>
           <span
             style={{
@@ -454,7 +456,7 @@ function WeekBanner({ meta }: { meta: WeekMeta }) {
               fontWeight: 600,
             }}
           >
-            Top-10 → 30 days Word Pro · Top-100 → 5 free replays
+            {t('lb.prizes_summary')}
           </span>
           {remaining && (
             <span
@@ -465,7 +467,7 @@ function WeekBanner({ meta }: { meta: WeekMeta }) {
                 letterSpacing: 1,
               }}
             >
-              Ends Sun 23:59 UTC · {remaining}
+              {t('lb.ends_sunday', { time: remaining })}
             </span>
           )}
           {meta.selfRank !== null && (
@@ -478,7 +480,10 @@ function WeekBanner({ meta }: { meta: WeekMeta }) {
                 marginTop: 4,
               }}
             >
-              You: #{meta.selfRank} · {meta.selfTotalScore ?? 0} pts
+              {t('lb.self_rank', {
+                rank: meta.selfRank,
+                pts: (meta.selfTotalScore ?? 0).toLocaleString(),
+              })}
             </span>
           )}
         </div>
@@ -561,7 +566,7 @@ function PodiumColumn({
           whiteSpace: 'nowrap',
         }}
       >
-        {entry.isSelf ? 'You' : entryName(entry)}
+        {entry.isSelf ? t('common.you') : entryName(entry)}
       </span>
       <span
         style={{
@@ -581,7 +586,7 @@ function PodiumColumn({
               letterSpacing: 0.5,
             }}
           >
-            pts
+            {t('lb.pts')}
           </span>
         )}
       </span>
@@ -714,7 +719,7 @@ function ListRow({ entry, mode }: { entry: UiEntry; mode: Mode }) {
               letterSpacing: 0.5,
             }}
           >
-            pts
+            {t('lb.pts')}
           </span>
         )}
       </span>
@@ -733,7 +738,7 @@ function EmptyState({ mode, onInvite }: { mode: Mode; onInvite: () => void }) {
           fontSize: 13,
         }}
       >
-        No scores yet today. Be the first.
+        {t('lb.empty_global')}
       </p>
     )
   }
@@ -747,7 +752,7 @@ function EmptyState({ mode, onInvite }: { mode: Mode; onInvite: () => void }) {
           fontSize: 13,
         }}
       >
-        New tournament. Be the first to score.
+        {t('lb.empty_week')}
       </p>
     )
   }
@@ -769,11 +774,10 @@ function EmptyState({ mode, onInvite }: { mode: Mode; onInvite: () => void }) {
           maxWidth: 280,
         }}
       >
-        No friends here yet. Invite someone to play and you'll show up in each
-        other's Friends leaderboard.
+        {t('lb.empty_friends')}
       </p>
       <SaloonButton variant="primary" size="sm" onClick={onInvite}>
-        Invite friends
+        {t('home.invite_friends')}
       </SaloonButton>
     </div>
   )

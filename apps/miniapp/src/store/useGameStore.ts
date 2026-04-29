@@ -16,6 +16,7 @@ import {
   submitSession,
   type StreakRewardType,
 } from '../lib/api'
+import { getLang } from '../lib/i18n'
 import { showRewardedAd } from '../lib/monetag'
 import { track } from '../lib/analytics'
 import { captureMessage } from '../lib/sentry'
@@ -331,6 +332,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       score,
       durationSec: GAME_DURATION_SECONDS,
       tzOffsetMin,
+      languageCode: getLang(),
     })
     // Сохраняем уже известный набор тем — submit-score его не возвращает,
     // а перезатирать пустым массивом нельзя, иначе ShopScreen «забудет» owned.

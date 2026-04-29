@@ -21,10 +21,12 @@ import {
   revokePurchase,
 } from '../supabase.js';
 import { posthog } from '../posthog.js';
+import { bt, detectBotLang } from '../i18n.js';
 
 export function registerPaymentHandlers(bot: Bot): void {
   bot.on('pre_checkout_query', async (ctx) => {
     const q = ctx.preCheckoutQuery;
+    const lang = detectBotLang(q.from.language_code ?? null);
 
     const parsed = parseInvoicePayload(q.invoice_payload);
     if (!parsed) {
@@ -34,7 +36,7 @@ export function registerPaymentHandlers(bot: Bot): void {
         properties: { reason: 'invalid_payload' },
       });
       await ctx.answerPreCheckoutQuery(false, {
-        error_message: 'Invalid order. Please try again.',
+        error_message: bt('invoice_invalid_order', lang),
       });
       return;
     }
@@ -46,7 +48,7 @@ export function registerPaymentHandlers(bot: Bot): void {
         properties: { reason: 'user_mismatch', product_id: parsed.productId },
       });
       await ctx.answerPreCheckoutQuery(false, {
-        error_message: 'Order does not match your account. Please try again.',
+        error_message: bt('invoice_user_mismatch', lang),
       });
       return;
     }
@@ -105,31 +107,27 @@ export function registerPaymentHandlers(bot: Bot): void {
 
     let wasNew: boolean;
     let successText: string;
+    const lang = detectBotLang(from.language_code ?? null);
 
     try {
       if (parsed.productId === 'replay') {
         const result = await grantReplayCredit(grantBase);
         wasNew = result.wasNew;
-        successText =
-          '✅ Payment received! You got *1 extra game today* — open Word Royale and play again.';
+        successText = bt('payment_replay_success', lang);
       } else if (parsed.productId === 'double_score') {
         const result = await grantDoubleScore(grantBase);
         wasNew = result.wasNew;
-        successText =
-          '✅ Payment received! *Double score* is active — your next game today will count for 2×.';
+        successText = bt('payment_double_score_success', lang);
       } else if (parsed.productId === 'pro_subscription') {
         const result = await grantProSubscription(grantBase);
         wasNew = result.wasNew;
-        const until = result.expiresAt
-          ? new Date(result.expiresAt).toUTCString().slice(0, 16)
-          : '30 days from now';
-        successText = `✅ Payment received! *Word Pro* active until ${until} — unlimited daily plays + all themes.`;
+        successText = bt('payment_pro_success', lang);
+        void result.expiresAt;
       } else if (isThemeProductId(parsed.productId)) {
         const themeId = themeIdFromProductId(parsed.productId);
-        const product = getProduct(parsed.productId);
         const result = await grantTheme({ ...grantBase, themeId });
         wasNew = result.wasNew;
-        successText = `✅ Payment received! *${product.title}* unlocked — open Word Royale and apply it from Shop.`;
+        successText = bt('payment_theme_success', lang);
       } else {
         console.error('successful_payment for unknown product', parsed.productId);
         return;
@@ -227,9 +225,8 @@ export function registerPaymentHandlers(bot: Bot): void {
 
       // Шлём подтверждение, чтобы юзер видел — мы знаем про refund.
       // Текст краткий, Telegram сам показывает банковское подтверждение возврата.
-      await ctx.reply(
-        '↩️ Refund processed. The purchase has been revoked from your account.',
-      );
+      const refundLang = detectBotLang(from.language_code ?? null);
+      await ctx.reply(bt('refund_confirmed', refundLang));
     } catch (err) {
       console.error('revoke_purchase failed', err);
       posthog.captureException(err, String(from.id), {
