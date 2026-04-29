@@ -71,6 +71,7 @@ export default function MeScreen() {
             totalGames: res.totalGames,
             daysPlayed: res.daysPlayed,
             currentStreak: res.currentStreak,
+            bestStreak: res.bestStreak,
             totalWordsFound: res.totalWordsFound,
             longestWord: res.longestWord,
           },
@@ -325,6 +326,17 @@ export default function MeScreen() {
                     }`
               }
               highlight={statsState.stats.currentStreak >= 2}
+            />
+            <StatRow
+              label="Best streak"
+              value={
+                statsState.stats.bestStreak === 0
+                  ? '—'
+                  : `${statsState.stats.bestStreak} day${
+                      statsState.stats.bestStreak === 1 ? '' : 's'
+                    }`
+              }
+              highlight={statsState.stats.bestStreak >= 3}
             />
             <StatRow
               label="Words found"

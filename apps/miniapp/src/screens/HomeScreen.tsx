@@ -96,6 +96,7 @@ export default function HomeScreen() {
   const proActive = todayStatus.loaded && todayStatus.proActive
   const adsWatchedToday = todayStatus.loaded ? todayStatus.adsWatchedToday : 0
   const adsMaxPerDay = todayStatus.loaded ? todayStatus.adsMaxPerDay : 0
+  const currentStreak = todayStatus.loaded ? todayStatus.currentStreak : 0
   const noFreeNoCredits = playedToday && replayCredits === 0 && !proActive
   const adReplayAvailable =
     noFreeNoCredits &&
@@ -185,7 +186,7 @@ export default function HomeScreen() {
           minHeight: 32,
         }}
       >
-        <StreakChip days={1} />
+        {currentStreak > 0 ? <StreakChip days={currentStreak} /> : <span />}
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           {proActive && <ProBadge />}
           <button

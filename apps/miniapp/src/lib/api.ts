@@ -30,6 +30,13 @@ export interface SubmitSessionPayload {
   durationSec: number
 }
 
+// streakReward возможные значения:
+//   'replay_credit' — +1 replay credit (3 day streak)
+//   'theme_neon'    — бесплатная тема neon (7 day streak)
+//   'pro_30d'       — Word Pro на 30 дней (30 day streak)
+//   null            — milestone не пересечён или RPC не выдала награду (race)
+export type StreakRewardType = 'replay_credit' | 'theme_neon' | 'pro_30d'
+
 export interface SubmitSessionSuccess {
   ok: true
   score: number
@@ -38,6 +45,9 @@ export interface SubmitSessionSuccess {
   wasReplay: boolean
   replayCreditsLeft: number
   doubleScoreUsed: boolean
+  currentStreak: number
+  streakMilestoneReached: number
+  streakReward: StreakRewardType | null
 }
 
 export interface SubmitSessionFailure {
@@ -87,7 +97,26 @@ export async function submitSession(
     }
   }
 
-  return json as SubmitSessionSuccess
+  const j = json as Record<string, unknown>
+  const rewardRaw = j.streakReward
+  const reward: StreakRewardType | null =
+    rewardRaw === 'replay_credit' ||
+    rewardRaw === 'theme_neon' ||
+    rewardRaw === 'pro_30d'
+      ? rewardRaw
+      : null
+  return {
+    ok: true,
+    score: Number(j.score ?? 0),
+    wordsCount: Number(j.wordsCount ?? 0),
+    seed: String(j.seed ?? ''),
+    wasReplay: Boolean(j.wasReplay),
+    replayCreditsLeft: Number(j.replayCreditsLeft ?? 0),
+    doubleScoreUsed: Boolean(j.doubleScoreUsed),
+    currentStreak: Number(j.currentStreak ?? 0),
+    streakMilestoneReached: Number(j.streakMilestoneReached ?? 0),
+    streakReward: reward,
+  }
 }
 
 export interface TodayStatus {
@@ -100,6 +129,8 @@ export interface TodayStatus {
   proExpiresAt: string | null
   adsWatchedToday: number
   adsMaxPerDay: number
+  currentStreak: number
+  bestStreak: number
 }
 
 interface TodayStatusSuccess extends TodayStatus {
@@ -153,6 +184,8 @@ export async function fetchTodayStatus(
     proExpiresAt: typeof j.proExpiresAt === 'string' ? j.proExpiresAt : null,
     adsWatchedToday: Number(j.adsWatchedToday ?? 0),
     adsMaxPerDay: Number(j.adsMaxPerDay ?? 0),
+    currentStreak: Number(j.currentStreak ?? 0),
+    bestStreak: Number(j.bestStreak ?? 0),
   }
 }
 
@@ -161,6 +194,7 @@ export interface MeStats {
   totalGames: number
   daysPlayed: number
   currentStreak: number
+  bestStreak: number
   totalWordsFound: number
   longestWord: string | null
 }
@@ -207,6 +241,7 @@ export async function fetchMeStats(initData: string): Promise<MeStatsResult> {
     totalGames: Number(j.totalGames ?? 0),
     daysPlayed: Number(j.daysPlayed ?? 0),
     currentStreak: Number(j.currentStreak ?? 0),
+    bestStreak: Number(j.bestStreak ?? 0),
     totalWordsFound: Number(j.totalWordsFound ?? 0),
     longestWord: typeof j.longestWord === 'string' ? j.longestWord : null,
   }

@@ -45,10 +45,34 @@ function describeError(code: string | null): string {
   return ERROR_MESSAGES[code] ?? `Could not save result (${code}).`
 }
 
+// Текст награды в pixel-стиле, без эмоджи. Внутри карточки — крупный
+// «N day streak» в font-display и подпись с конкретной наградой.
+function describeStreakReward(
+  milestone: number,
+  reward: string | null,
+): { headline: string; reward: string } | null {
+  if (milestone <= 0) return null
+  const label = `${milestone} day streak`
+  if (reward === 'replay_credit') {
+    return { headline: label, reward: '+1 free replay credit' }
+  }
+  if (reward === 'theme_neon') {
+    return { headline: label, reward: 'Free theme unlocked: NEON' }
+  }
+  if (reward === 'pro_30d') {
+    return { headline: label, reward: 'Word Pro for 30 days' }
+  }
+  // milestone достигнут, но RPC не вернула награду (race) — всё равно
+  // показываем поздравление; ресет на следующем входе через refreshTodayStatus.
+  return { headline: label, reward: 'Reward delivered' }
+}
+
 export default function ResultScreen() {
   const score = useGameStore((s) => s.score)
   const serverScore = useGameStore((s) => s.serverScore)
   const doubleScoreApplied = useGameStore((s) => s.doubleScoreApplied)
+  const streakMilestoneReached = useGameStore((s) => s.streakMilestoneReached)
+  const streakReward = useGameStore((s) => s.streakReward)
   const foundWords = useGameStore((s) => s.foundWords)
   const seed = useGameStore((s) => s.seed)
   const startGame = useGameStore((s) => s.startGame)
@@ -145,8 +169,17 @@ export default function ResultScreen() {
   }
 
   // Тёплая поза кота для хорошего результата, blanket для слабого.
+  // Milestone-streak важнее оценки скора — даже слабая партия в день стрика
+  // должна выглядеть как победа, поэтому переключаем на trophy.
   const goodResult = displayScore >= 200 && foundWords.length >= 3
-  const catPose = goodResult ? 'trophy' : foundWords.length === 0 ? 'blanket' : 'proud'
+  const streakInfo = describeStreakReward(streakMilestoneReached, streakReward)
+  const catPose = streakInfo
+    ? 'trophy'
+    : goodResult
+      ? 'trophy'
+      : foundWords.length === 0
+        ? 'blanket'
+        : 'proud'
 
   return (
     <main
@@ -258,6 +291,54 @@ export default function ResultScreen() {
         >
           ×2 boost applied
         </p>
+      )}
+
+      {streakInfo && (
+        <Card
+          surface="leather"
+          padding={12}
+          style={{
+            marginTop: 14,
+            border: '1.5px solid var(--accent-brass)',
+            boxShadow:
+              '0 0 18px rgba(212,168,73,0.35), inset 0 0 12px rgba(255,140,66,0.1)',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'var(--font-pixel)',
+              fontSize: 10,
+              letterSpacing: 2,
+              color: 'var(--accent-brass-hi)',
+              textTransform: 'uppercase',
+            }}
+          >
+            ♛ Streak reward
+          </div>
+          <div
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 22,
+              color: 'var(--accent-lamp)',
+              marginTop: 4,
+              textShadow: '0 0 10px rgba(255,140,66,0.55)',
+            }}
+          >
+            {streakInfo.headline}
+          </div>
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 13,
+              fontWeight: 700,
+              color: 'var(--text-parchment)',
+              marginTop: 6,
+            }}
+          >
+            {streakInfo.reward}
+          </div>
+        </Card>
       )}
 
       <Card surface="table" padding={14} style={{ marginTop: 16 }}>

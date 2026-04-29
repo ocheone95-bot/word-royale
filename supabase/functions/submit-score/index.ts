@@ -220,6 +220,8 @@ Deno.serve(async (req) => {
     result_code: string;
     score_applied: number | null;
     double_score_used: boolean | null;
+    current_streak: number | null;
+    streak_milestone_reached: number | null;
   };
   if (result.result_code === 'no_replay') {
     return jsonResponse(403, {
@@ -248,6 +250,28 @@ Deno.serve(async (req) => {
     // ignore
   }
 
+  // Streak-награда: insert_game_session помечает streak_milestone_reached>0,
+  // когда юзер впервые перешагнул 3/7/30 day-порог. claim_streak_reward
+  // атомарно начисляет (replay credit / тема / Pro 30d) с idempotency-check
+  // через last_streak_milestone_reached. Ошибки не фатальны для submit-score.
+  let streakReward: string | null = null;
+  const milestoneReached = result.streak_milestone_reached ?? 0;
+  if (milestoneReached > 0) {
+    try {
+      const { data: rewardRows } = await supabase.rpc('claim_streak_reward', {
+        p_user_id: userRow.id,
+        p_milestone: milestoneReached,
+      });
+      const rewardRow =
+        Array.isArray(rewardRows) && rewardRows.length > 0 ? rewardRows[0] : null;
+      if (rewardRow && (rewardRow as { granted?: boolean }).granted) {
+        streakReward = (rewardRow as { reward_type?: string | null }).reward_type ?? null;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   // score_applied = expectedScore × 2, если double_score_used=true. Возвращаем
   // клиенту его, чтобы UI и лидерборд показали один и тот же финальный счёт.
   return jsonResponse(200, {
@@ -258,5 +282,8 @@ Deno.serve(async (req) => {
     wasReplay: result.was_replay ?? false,
     replayCreditsLeft: result.replay_credits_left ?? 0,
     doubleScoreUsed: result.double_score_used ?? false,
+    currentStreak: result.current_streak ?? 0,
+    streakMilestoneReached: milestoneReached,
+    streakReward,
   });
 });
