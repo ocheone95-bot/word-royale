@@ -289,6 +289,29 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Pro free trial: после 3-й уникальной non-replay сессии юзер впервые
+  // получает 1 день Pro бесплатно. RPC сама проверяет idempotency, threshold,
+  // отсутствие активной подписки. Не зовём для replay-сессий — replay'ы куплены
+  // за Stars и не должны конвертироваться в trial.
+  let proTrialGranted = false;
+  let proTrialExpiresAt: string | null = null;
+  if (!result.was_replay) {
+    try {
+      const { data: trialRows } = await supabase.rpc('try_grant_pro_trial', {
+        p_user_id: userRow.id,
+      });
+      const trialRow =
+        Array.isArray(trialRows) && trialRows.length > 0 ? trialRows[0] : null;
+      if (trialRow && (trialRow as { granted?: boolean }).granted) {
+        proTrialGranted = true;
+        proTrialExpiresAt =
+          (trialRow as { expires_at?: string | null }).expires_at ?? null;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   // score_applied = expectedScore × 2, если double_score_used=true. Возвращаем
   // клиенту его, чтобы UI и лидерборд показали один и тот же финальный счёт.
   return jsonResponse(200, {
@@ -302,5 +325,7 @@ Deno.serve(async (req) => {
     currentStreak: result.current_streak ?? 0,
     streakMilestoneReached: milestoneReached,
     streakReward,
+    proTrialGranted,
+    proTrialExpiresAt,
   });
 });

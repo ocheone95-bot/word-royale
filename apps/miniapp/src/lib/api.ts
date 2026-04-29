@@ -51,6 +51,8 @@ export interface SubmitSessionSuccess {
   currentStreak: number
   streakMilestoneReached: number
   streakReward: StreakRewardType | null
+  proTrialGranted: boolean
+  proTrialExpiresAt: string | null
 }
 
 export interface SubmitSessionFailure {
@@ -119,6 +121,9 @@ export async function submitSession(
     currentStreak: Number(j.currentStreak ?? 0),
     streakMilestoneReached: Number(j.streakMilestoneReached ?? 0),
     streakReward: reward,
+    proTrialGranted: Boolean(j.proTrialGranted),
+    proTrialExpiresAt:
+      typeof j.proTrialExpiresAt === 'string' ? j.proTrialExpiresAt : null,
   }
 }
 
@@ -134,6 +139,8 @@ export interface TodayStatus {
   adsMaxPerDay: number
   currentStreak: number
   bestStreak: number
+  proTrialActive: boolean
+  proTrialUsed: boolean
 }
 
 interface TodayStatusSuccess extends TodayStatus {
@@ -189,6 +196,8 @@ export async function fetchTodayStatus(
     adsMaxPerDay: Number(j.adsMaxPerDay ?? 0),
     currentStreak: Number(j.currentStreak ?? 0),
     bestStreak: Number(j.bestStreak ?? 0),
+    proTrialActive: Boolean(j.proTrialActive),
+    proTrialUsed: Boolean(j.proTrialUsed),
   }
 }
 

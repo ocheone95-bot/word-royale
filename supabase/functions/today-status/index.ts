@@ -14,6 +14,8 @@
 //     adsMaxPerDay: number,         // дневной лимит (анти-чит)
 //     currentStreak: number,        // текущая серия дней подряд (UTC)
 //     bestStreak: number,           // лучшая серия за всё время
+//     proTrialActive: boolean,      // free trial активен сейчас (выдан < 24h назад и proActive)
+//     proTrialUsed: boolean,        // юзер когда-либо получал trial (для UI «trial expired»)
 //   }
 //
 // Используется HomeScreen / ResultScreen / ShopScreen — для подсветки купленных
@@ -92,7 +94,7 @@ Deno.serve(async (req) => {
   const { data: meRow, error: meErr } = await supabase
     .from('users')
     .select(
-      'id, replay_credits, double_score_date, ads_watched_date, ads_watched_count, current_streak, best_streak',
+      'id, replay_credits, double_score_date, ads_watched_date, ads_watched_count, current_streak, best_streak, pro_trial_granted_at',
     )
     .eq('telegram_id', verified.user.id)
     .maybeSingle();
@@ -119,6 +121,8 @@ Deno.serve(async (req) => {
       adsMaxPerDay: ADS_MAX_PER_DAY,
       currentStreak: 0,
       bestStreak: 0,
+      proTrialActive: false,
+      proTrialUsed: false,
     });
   }
 
@@ -191,6 +195,19 @@ Deno.serve(async (req) => {
       ? (meRow.ads_watched_count as number) ?? 0
       : 0;
 
+  // Trial active = pro_trial_granted_at был в последние 24h И сейчас Pro
+  // активна. Если юзер за trial успел купить paid Pro — после 24h flag
+  // автоматически потушится (UI переключится с «Trial · 5h left» на «Pro»).
+  const trialGrantedAt =
+    typeof meRow.pro_trial_granted_at === 'string'
+      ? meRow.pro_trial_granted_at
+      : null;
+  const proTrialUsed = trialGrantedAt !== null;
+  const proTrialActive =
+    proActive &&
+    trialGrantedAt !== null &&
+    new Date(trialGrantedAt).getTime() + 24 * 60 * 60 * 1000 > Date.now();
+
   return jsonResponse(200, {
     ok: true,
     playedToday,
@@ -205,5 +222,7 @@ Deno.serve(async (req) => {
     adsMaxPerDay: ADS_MAX_PER_DAY,
     currentStreak: (meRow.current_streak as number) ?? 0,
     bestStreak: (meRow.best_streak as number) ?? 0,
+    proTrialActive,
+    proTrialUsed,
   });
 });

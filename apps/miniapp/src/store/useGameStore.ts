@@ -44,6 +44,8 @@ export type TodayStatusState =
       adsMaxPerDay: number
       currentStreak: number
       bestStreak: number
+      proTrialActive: boolean
+      proTrialUsed: boolean
     }
 
 
@@ -108,6 +110,9 @@ interface GameState {
   // Тип выданной награды (replay_credit/theme_neon/pro_30d) или null если RPC
   // не выдала (race с другой сессией) — UI показывает соответствующий toast.
   streakReward: StreakRewardType | null
+  // True, если submit-score только что выдал Pro free trial (после 3-й партии).
+  // ResultScreen рендерит trial-unlocked Card. Сбрасывается при startGame.
+  proTrialGranted: boolean
 
   // статус юзера на сегодня — играл ли уже и сколько replay-токенов
   todayStatus: TodayStatusState
@@ -158,6 +163,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   doubleScoreApplied: false,
   streakMilestoneReached: 0,
   streakReward: null,
+  proTrialGranted: false,
 
   todayStatus: { loaded: false },
 
@@ -221,6 +227,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       doubleScoreApplied: false,
       streakMilestoneReached: 0,
       streakReward: null,
+      proTrialGranted: false,
     })
   },
 
@@ -330,30 +337,52 @@ export const useGameStore = create<GameState>((set, get) => ({
     const prevAdsCount = prevStatus.loaded ? prevStatus.adsWatchedToday : 0
     const prevAdsMax = prevStatus.loaded ? prevStatus.adsMaxPerDay : 0
     const prevBestStreak = prevStatus.loaded ? prevStatus.bestStreak : 0
+    const prevTrialActive = prevStatus.loaded ? prevStatus.proTrialActive : false
+    const prevTrialUsed = prevStatus.loaded ? prevStatus.proTrialUsed : false
     if (result.ok) {
-      // Streak-награда меняет владение темой / Pro-статус — патчим оптимистично,
-      // чтобы UI на ResultScreen и MeScreen увидел изменения сразу. Полное
-      // обновление придёт через refreshTodayStatus при следующем mount.
-      const themesAfter = result.streakReward === 'theme_neon' && !prevThemes.includes('neon')
-        ? [...prevThemes, 'neon']
-        : prevThemes
-      const proAfter = result.streakReward === 'pro_30d' ? true : prevPro
+      // Streak-награда + Pro free trial меняют owned themes / proActive — патчим
+      // оптимистично, чтобы UI на ResultScreen и MeScreen увидел изменения
+      // сразу. Полное обновление придёт через refreshTodayStatus.
+      const themesAfter =
+        result.streakReward === 'theme_neon' && !prevThemes.includes('neon')
+          ? [...prevThemes, 'neon']
+          : prevThemes
+      // Pro может включиться двумя путями за одну сессию — streak 30d и/или
+      // trial. Trial короче (24h), streak 30d длиннее — берём дальнюю дату.
+      const proRewardActive =
+        result.streakReward === 'pro_30d' || result.proTrialGranted
+      const proAfter = proRewardActive ? true : prevPro
+      const candidateExpires: number[] = []
+      if (prevProExpires) candidateExpires.push(new Date(prevProExpires).getTime())
+      if (result.streakReward === 'pro_30d') {
+        candidateExpires.push(
+          Math.max(
+            prevProExpires ? new Date(prevProExpires).getTime() : 0,
+            Date.now(),
+          ) + 30 * 24 * 60 * 60 * 1000,
+        )
+      }
+      if (result.proTrialGranted && result.proTrialExpiresAt) {
+        candidateExpires.push(new Date(result.proTrialExpiresAt).getTime())
+      }
       const proExpiresAfter =
-        result.streakReward === 'pro_30d'
-          ? new Date(
-              Math.max(
-                prevProExpires ? new Date(prevProExpires).getTime() : 0,
-                Date.now(),
-              ) + 30 * 24 * 60 * 60 * 1000,
-            ).toISOString()
-          : prevProExpires
+        candidateExpires.length === 0
+          ? prevProExpires
+          : new Date(Math.max(...candidateExpires)).toISOString()
       const newCurrentStreak = result.currentStreak
       const newBestStreak = Math.max(prevBestStreak, newCurrentStreak)
+      const trialActiveAfter = result.proTrialGranted ? true : prevTrialActive
+      const trialUsedAfter = result.proTrialGranted ? true : prevTrialUsed
       if (result.streakMilestoneReached > 0) {
         track('streak_milestone_reached', {
           milestone: result.streakMilestoneReached,
           reward_type: result.streakReward ?? 'none',
           current_streak: newCurrentStreak,
+        })
+      }
+      if (result.proTrialGranted) {
+        track('pro_trial_granted', {
+          expires_at: result.proTrialExpiresAt,
         })
       }
       set({
@@ -363,6 +392,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         submitError: null,
         streakMilestoneReached: result.streakMilestoneReached,
         streakReward: result.streakReward,
+        proTrialGranted: result.proTrialGranted,
         // На сегодня юзер уже точно играл; кредиты могли уменьшиться
         // (если это была replay-сессия). Если буст потратился — флаг тушим.
         // Pro-статус submit-score не возвращает — сохраняем предыдущий.
@@ -378,6 +408,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           adsMaxPerDay: prevAdsMax,
           currentStreak: newCurrentStreak,
           bestStreak: newBestStreak,
+          proTrialActive: trialActiveAfter,
+          proTrialUsed: trialUsedAfter,
         },
       })
     } else {
@@ -403,6 +435,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             adsMaxPerDay: prevAdsMax,
             currentStreak: prevStreak,
             bestStreak: prevBestStreak,
+            proTrialActive: prevTrialActive,
+            proTrialUsed: prevTrialUsed,
           },
         })
       } else {
@@ -444,6 +478,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         adsMaxPerDay: result.adsMaxPerDay,
         currentStreak: result.currentStreak,
         bestStreak: result.bestStreak,
+        proTrialActive: result.proTrialActive,
+        proTrialUsed: result.proTrialUsed,
       },
     })
   },
