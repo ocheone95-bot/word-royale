@@ -170,6 +170,7 @@ const EN_STRINGS = {
   'home.weekly_rank_top100': '♛ You\'re #{n} this week',
   'home.weekly_prize_top10': 'Top-10 · 30d Pro on Sun',
   'home.weekly_prize_top100': 'Top-100 · 5 free replays on Sun',
+  'home.english_letters_hint': 'English letters · same puzzle worldwide',
   'home.sound_on': 'On',
   'home.sound_off': 'Off',
 
@@ -389,6 +390,7 @@ const RU_STRINGS: Record<StringKey, string> = {
   'home.weekly_rank_top100': '♛ Ты #{n} на этой неделе',
   'home.weekly_prize_top10': 'Топ-10 · 30д Pro в воскресенье',
   'home.weekly_prize_top100': 'Топ-100 · 5 реплеев в воскресенье',
+  'home.english_letters_hint': 'Английские буквы · один паззл для всего мира',
   'home.sound_on': 'Вкл',
   'home.sound_off': 'Выкл',
 
@@ -540,7 +542,7 @@ const RU_STRINGS: Record<StringKey, string> = {
     'Составляй как можно больше слов из 7 букв за 90 секунд.',
   'onb.slide2_title': 'Один паззл в день',
   'onb.slide2_body':
-    'Те же буквы для всего мира. Новые каждые сутки в 00:00 UTC.',
+    'Те же 7 английских букв для всего мира. Новые каждые сутки в 00:00 UTC.',
   'onb.slide3_title': 'Поднимись в таблице',
   'onb.slide3_body':
     'Дневной и недельный турниры. Топ-игроки получают Word Pro и реплеи.',
