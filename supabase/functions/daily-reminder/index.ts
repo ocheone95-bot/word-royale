@@ -23,6 +23,7 @@ interface ReminderUser {
   telegram_id: number;
   current_streak: number;
   local_today: string;
+  language_code: string | null;
 }
 
 const MINI_APP_URL =
@@ -35,8 +36,29 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-function buildMessage(streak: number): string {
+type Lang = 'en' | 'ru';
+
+function resolveLang(input: string | null): Lang {
+  if (input === 'ru') return 'ru';
+  return 'en';
+}
+
+function buildMessage(streak: number, lang: Lang): string {
   // Без эмоджи (PM-фидбек, сессия 12). Pixel-spade ♠ как в StreakChip.
+  if (lang === 'ru') {
+    if (streak >= 1) {
+      return [
+        `♠ ${streak} ${pluralRuDays(streak)} подряд — не теряй серию`,
+        '',
+        'Сегодняшний паззл Word Royale готов. 90 секунд — и серия продлится.',
+      ].join('\n');
+    }
+    return [
+      '♠ Сегодняшний паззл Word Royale готов',
+      '',
+      'Те же 7 букв для всего мира. 90 секунд. Нажми кнопку ниже.',
+    ].join('\n');
+  }
   if (streak >= 1) {
     return [
       `♠ ${streak} day streak — keep it alive`,
@@ -51,10 +73,23 @@ function buildMessage(streak: number): string {
   ].join('\n');
 }
 
+function pluralRuDays(n: number): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return 'день';
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return 'дня';
+  return 'дней';
+}
+
+function buildPlayButton(lang: Lang): string {
+  return lang === 'ru' ? '▶️ Играть' : '▶️ Play now';
+}
+
 async function sendTelegramMessage(
   botToken: string,
   chatId: number,
   text: string,
+  buttonText: string,
 ): Promise<{ ok: boolean; status?: number; description?: string }> {
   const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
   let res: Response;
@@ -67,7 +102,7 @@ async function sendTelegramMessage(
         text,
         reply_markup: {
           inline_keyboard: [
-            [{ text: '▶️ Play now', web_app: { url: MINI_APP_URL } }],
+            [{ text: buttonText, web_app: { url: MINI_APP_URL } }],
           ],
         },
       }),
@@ -132,8 +167,14 @@ Deno.serve(async (req) => {
   // (десятки-сотни юзеров одновременно) не упрёмся, но ставим лёгкую задержку,
   // чтобы не словить 429 при росте.
   for (const user of users) {
-    const text = buildMessage(user.current_streak ?? 0);
-    const result = await sendTelegramMessage(botToken, user.telegram_id, text);
+    const lang = resolveLang(user.language_code);
+    const text = buildMessage(user.current_streak ?? 0, lang);
+    const result = await sendTelegramMessage(
+      botToken,
+      user.telegram_id,
+      text,
+      buildPlayButton(lang),
+    );
     if (result.ok) {
       sent += 1;
       const { error: markErr } = await supabase.rpc('mark_reminder_sent', {

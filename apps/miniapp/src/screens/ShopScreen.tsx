@@ -26,6 +26,7 @@ import {
   TabBar,
   type TabKey,
 } from '../components/saloon'
+import { t, useLang } from '../lib/i18n'
 
 const REPLAY_PRICE_STARS = 50
 const THEME_PRICE_STARS = 100
@@ -124,6 +125,7 @@ const THEME_CATALOG: readonly ThemeCatalogEntry[] = [
 ] as const
 
 export default function ShopScreen() {
+  useLang()
   const initData = useRawInitData()
   const goHome = useGameStore((s) => s.goHome)
   const showLeaderboard = useGameStore((s) => s.showLeaderboard)
@@ -236,7 +238,7 @@ export default function ShopScreen() {
             WebkitTapHighlightColor: 'transparent',
           }}
         >
-          ← Back
+          ← {t('common.back')}
         </button>
         <h1
           style={{
@@ -248,7 +250,7 @@ export default function ShopScreen() {
             letterSpacing: 1,
           }}
         >
-          Shop
+          {t('shop.title')}
         </h1>
         {proActive ? <ProBadge /> : <span style={{ width: 40 }} />}
       </header>
@@ -279,41 +281,27 @@ export default function ShopScreen() {
         — Mostaccio’s general store —
       </p>
 
-      <Section title="Replay">
+      <Section title={t('shop.replay_section')}>
         <ShopCard
-          title="Extra game today"
+          title={t('shop.replay_section')}
           description={
             proActive
-              ? 'Word Pro already gives you unlimited daily plays.'
-              : "Play today's puzzle one more time."
+              ? t('shop.pro_perks_unlimited')
+              : t('shop.replay_desc')
           }
           badge={
             proActive
-              ? 'Included with Pro'
+              ? t('shop.theme_active')
               : replayCredits > 0
-                ? `${replayCredits} owned`
+                ? `${replayCredits} ${t('shop.theme_owned')}`
                 : null
           }
-          buyLabel={
-            replayCredits > 0
-              ? `Buy more · ${REPLAY_PRICE_STARS} ⭐`
-              : `Buy · ${REPLAY_PRICE_STARS} ⭐`
-          }
+          buyLabel={t('shop.replay_buy', { price: REPLAY_PRICE_STARS })}
           onBuy={handleBuyReplay}
         />
       </Section>
 
-      <Section title="Themes">
-        <p
-          style={{
-            fontSize: 11,
-            color: 'var(--text-parchment-dim)',
-            margin: '0 0 10px 0',
-            lineHeight: 1.4,
-          }}
-        >
-          Switch the whole room. Tap a theme you own to apply it.
-        </p>
+      <Section title={t('shop.themes_section')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {THEME_CATALOG.map((theme) => (
             <ThemeCard
@@ -329,17 +317,17 @@ export default function ShopScreen() {
         </div>
       </Section>
 
-      <Section title="Boosts">
+      <Section title={t('shop.boosts_section')}>
         <ShopCard
           title="Double Score"
-          description="Multiply the score of your next game today by 2×."
-          badge={doubleScoreActive ? 'Active today' : null}
-          buyLabel={`Buy · ${DOUBLE_SCORE_PRICE_STARS} ⭐`}
+          description={t('shop.double_score_desc')}
+          badge={doubleScoreActive ? t('shop.double_score_active') : null}
+          buyLabel={t('shop.double_score_buy', { price: DOUBLE_SCORE_PRICE_STARS })}
           onBuy={handleBuyDoubleScore}
         />
       </Section>
 
-      <Section title="Subscription">
+      <Section title={t('shop.subscription_section')}>
         <ProCard
           active={proActive}
           expiresAt={proExpiresAt}
@@ -501,7 +489,7 @@ function ThemeCard({
             >
               {theme.title}
             </h3>
-            {active && <Badge tone="lamp">Active</Badge>}
+            {active && <Badge tone="lamp">{t('shop.theme_active')}</Badge>}
           </div>
           <p
             style={{
@@ -537,11 +525,11 @@ function ThemeCard({
             onClick={active ? undefined : onApply}
             disabled={active}
           >
-            {active ? '✓ Applied' : 'Apply'}
+            {active ? `✓ ${t('shop.theme_active')}` : t('shop.theme_apply')}
           </SaloonButton>
         ) : (
           <SaloonButton variant="primary" size="sm" fullWidth onClick={onBuy}>
-            Buy · {THEME_PRICE_STARS} ⭐
+            {t('shop.theme_buy', { price: THEME_PRICE_STARS })}
           </SaloonButton>
         )}
       </div>
@@ -648,7 +636,7 @@ function ProCard({ active, expiresAt, onBuy }: ProCardProps) {
               lineHeight: 1.1,
             }}
           >
-            Word Pro
+            {t('shop.pro_title')}
           </h3>
           <p
             style={{
@@ -660,7 +648,7 @@ function ProCard({ active, expiresAt, onBuy }: ProCardProps) {
               margin: '4px 0 0 0',
             }}
           >
-            {PRO_PRICE_STARS} ⭐ / month
+            {t('shop.pro_price', { price: PRO_PRICE_STARS })}
           </p>
         </div>
         <ProBadge />
@@ -676,10 +664,10 @@ function ProCard({ active, expiresAt, onBuy }: ProCardProps) {
         }}
       >
         {[
-          'Unlimited daily plays',
-          'All themes unlocked',
-          'Pro-only leaderboard',
-          'Extended stats',
+          t('shop.pro_perks_unlimited'),
+          t('shop.pro_perks_themes'),
+          t('shop.pro_perks_pro_board'),
+          t('shop.pro_perks_no_ads'),
         ].map((line) => (
           <li
             key={line}
@@ -713,11 +701,11 @@ function ProCard({ active, expiresAt, onBuy }: ProCardProps) {
             marginBottom: 12,
           }}
         >
-          Active · until {expiryLabel}
+          {t('shop.pro_active_until', { date: expiryLabel })}
         </div>
       )}
       <SaloonButton variant="primary" size="md" fullWidth onClick={onBuy}>
-        {active ? `Renew · ${PRO_PRICE_STARS} ⭐` : `Subscribe · ${PRO_PRICE_STARS} ⭐`}
+        {t('shop.pro_buy', { price: PRO_PRICE_STARS })}
       </SaloonButton>
     </div>
   )

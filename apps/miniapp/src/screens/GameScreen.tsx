@@ -11,6 +11,7 @@ import { useDictionary } from '../hooks/useDictionary'
 import { hapticImpact } from '../lib/haptics'
 import { Mostaccio, type MostaccioPose } from '../components/Mostaccio'
 import { Card, LetterTile, SaloonButton, Scanlines, StatPanel } from '../components/saloon'
+import { t, useLang } from '../lib/i18n'
 
 function formatTimer(timeLeft: number): string {
   const m = Math.floor(timeLeft / 60)
@@ -19,13 +20,17 @@ function formatTimer(timeLeft: number): string {
 }
 
 function feedbackEyebrow(feedback: Feedback): { text: string; isError: boolean } {
-  if (feedback === 'invalid') return { text: 'Not a word', isError: true }
-  if (feedback === 'duplicate') return { text: 'Already found', isError: true }
-  if (feedback === 'too-short') return { text: 'Too short', isError: true }
-  return { text: 'Now spelling', isError: false }
+  if (feedback === 'invalid')
+    return { text: t('game.feedback_invalid'), isError: true }
+  if (feedback === 'duplicate')
+    return { text: t('game.feedback_duplicate'), isError: true }
+  if (feedback === 'too-short')
+    return { text: t('game.feedback_too_short'), isError: true }
+  return { text: t('game.now_spelling'), isError: false }
 }
 
 export default function GameScreen() {
+  useLang()
   const { dict, error } = useDictionary()
   const seed = useGameStore((s) => s.seed)
   const letters = useGameStore((s) => s.letters)
@@ -135,7 +140,7 @@ export default function GameScreen() {
           justifyContent: 'space-between',
         }}
       >
-        <StatPanel label="Score" value={String(score)} />
+        <StatPanel label={t('game.score')} value={String(score)} />
         <button
           type="button"
           onClick={handleGoHome}
@@ -154,7 +159,7 @@ export default function GameScreen() {
           ×
         </button>
         <StatPanel
-          label="Time"
+          label={t('game.time')}
           value={formatTimer(timeLeft)}
           warning={timeLeft <= 10 && timeLeft > 0}
         />
@@ -173,7 +178,7 @@ export default function GameScreen() {
             textShadow: '0 0 8px rgba(212,168,73,0.5)',
           }}
         >
-          ×2 boost
+          {t('game.boost_x2')}
         </p>
       )}
 
@@ -290,7 +295,7 @@ export default function GameScreen() {
               disabled={selectedIndices.length === 0}
               style={{ flex: 1 }}
             >
-              ↶ Undo
+              ↶ {t('game.undo')}
             </SaloonButton>
             <SaloonButton
               variant="primary"
@@ -299,7 +304,7 @@ export default function GameScreen() {
               disabled={selectedIndices.length < 3}
               style={{ flex: 1.4 }}
             >
-              ↵ Submit
+              ↵ {t('game.submit')}
             </SaloonButton>
             <SaloonButton
               variant="secondary"
@@ -308,7 +313,7 @@ export default function GameScreen() {
               disabled={selectedIndices.length === 0}
               style={{ flex: 1 }}
             >
-              ⟲ Clear
+              ⟲ {t('game.clear')}
             </SaloonButton>
           </div>
 
@@ -355,7 +360,7 @@ function FoundWordsCard({ words, seed }: { words: readonly string[]; seed: strin
           fontFamily: 'var(--font-ui)',
         }}
       >
-        Find your first word · {seed}
+        {seed}
       </p>
     )
   }
@@ -371,7 +376,7 @@ function FoundWordsCard({ words, seed }: { words: readonly string[]; seed: strin
           margin: '0 0 6px',
         }}
       >
-        Found · {words.length}
+        {t('result.words_found')} · {words.length}
       </p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
         {words.map((w) => (
@@ -420,7 +425,7 @@ function LoadingDictionary() {
         fontSize: 13,
       }}
     >
-      Loading dictionary…
+      {t('common.loading')}
     </div>
   )
 }

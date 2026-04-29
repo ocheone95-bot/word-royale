@@ -21,28 +21,31 @@ import { dayNumberSinceLaunch } from '../lib/day-number'
 import { useTickUp } from '../hooks/useTickUp'
 import { Mostaccio } from '../components/Mostaccio'
 import { Card, SaloonButton, Scanlines } from '../components/saloon'
+import { plural, t, tPlural, useLang } from '../lib/i18n'
 
 const REPLAY_PRICE_STARS = 50
 
-const ERROR_MESSAGES: Record<string, string> = {
-  env_missing: 'App is not configured.',
-  network: 'Network problem. Tap retry.',
-  invalid_init_data: 'Telegram session invalid. Reopen the bot.',
-  server_misconfigured: 'Server not ready. Try again in a minute.',
-  seed_mismatch: 'A new day has started — play again.',
-  letters_mismatch: 'Letters mismatch. Play again.',
-  score_mismatch: 'Score mismatch.',
-  duplicate_word: 'Duplicate word in submission.',
-  word_not_composable: 'Word does not match the letters.',
-  word_length: 'Word length out of range.',
-  words_not_in_dictionary: 'A word is not in the dictionary.',
-  bad_response: 'Server returned an unexpected response.',
-  no_replay: 'Already played today. Buy a replay to save another result.',
-}
-
 function describeError(code: string | null): string {
-  if (!code) return 'Could not save result.'
-  return ERROR_MESSAGES[code] ?? `Could not save result (${code}).`
+  if (!code) return t('result.could_not_save')
+  const key = `result.error_${code}` as Parameters<typeof t>[0]
+  const known: Record<string, Parameters<typeof t>[0]> = {
+    env_missing: 'result.error_env_missing',
+    network: 'result.error_network',
+    invalid_init_data: 'result.error_invalid_init_data',
+    server_misconfigured: 'result.error_server_misconfigured',
+    seed_mismatch: 'result.error_seed_mismatch',
+    letters_mismatch: 'result.error_letters_mismatch',
+    score_mismatch: 'result.error_score_mismatch',
+    duplicate_word: 'result.error_duplicate_word',
+    word_not_composable: 'result.error_word_not_composable',
+    word_length: 'result.error_word_length',
+    words_not_in_dictionary: 'result.error_words_not_in_dictionary',
+    bad_response: 'result.error_bad_response',
+    no_replay: 'result.error_no_replay',
+  }
+  if (code in known) return t(known[code])
+  return t('result.could_not_save') + ` (${code})`
+  void key
 }
 
 // Текст награды в pixel-стиле, без эмоджи. Внутри карточки — крупный
@@ -52,22 +55,28 @@ function describeStreakReward(
   reward: string | null,
 ): { headline: string; reward: string } | null {
   if (milestone <= 0) return null
-  const label = `${milestone} day streak`
+  const form = plural(milestone, { one: 'one', few: 'few', other: 'other' })
+  const headlineKey =
+    form === 'one'
+      ? 'result.streak_headline_one'
+      : form === 'few'
+        ? 'result.streak_headline_few'
+        : 'result.streak_headline_other'
+  const headline = t(headlineKey, { n: milestone })
   if (reward === 'replay_credit') {
-    return { headline: label, reward: '+1 free replay credit' }
+    return { headline, reward: t('result.streak_replay_credit') }
   }
   if (reward === 'theme_neon') {
-    return { headline: label, reward: 'Free theme unlocked: NEON' }
+    return { headline, reward: t('result.streak_theme_neon') }
   }
   if (reward === 'pro_30d') {
-    return { headline: label, reward: 'Word Pro for 30 days' }
+    return { headline, reward: t('result.streak_pro_30d') }
   }
-  // milestone достигнут, но RPC не вернула награду (race) — всё равно
-  // показываем поздравление; ресет на следующем входе через refreshTodayStatus.
-  return { headline: label, reward: 'Reward delivered' }
+  return { headline, reward: t('result.streak_delivered') }
 }
 
 export default function ResultScreen() {
+  useLang()
   const score = useGameStore((s) => s.score)
   const serverScore = useGameStore((s) => s.serverScore)
   const doubleScoreApplied = useGameStore((s) => s.doubleScoreApplied)
@@ -142,9 +151,7 @@ export default function ResultScreen() {
     setAdInProgress(false)
     if (!res.ok) {
       setAdError(
-        res.reason === 'limit'
-          ? 'Daily ad limit reached.'
-          : 'Ad not available right now.',
+        res.reason === 'limit' ? t('home.ad_limit') : t('home.ad_unavailable'),
       )
     }
   }
@@ -242,7 +249,7 @@ export default function ResultScreen() {
             boxShadow: '0 0 16px rgba(255,140,66,0.65)',
           }}
         >
-          Round over
+          {t('result.round_over')}
         </span>
       </div>
 
@@ -262,7 +269,7 @@ export default function ResultScreen() {
           textAlign: 'center',
         }}
       >
-        Final score
+        {t('result.final_score')}
       </p>
       <h1
         style={{
@@ -292,7 +299,7 @@ export default function ResultScreen() {
             textTransform: 'uppercase',
           }}
         >
-          ×2 boost applied
+          {t('result.boost_applied')}
         </p>
       )}
 
@@ -317,7 +324,7 @@ export default function ResultScreen() {
               textTransform: 'uppercase',
             }}
           >
-            ♛ Streak reward
+            {t('result.streak_reward_label')}
           </div>
           <div
             style={{
@@ -365,7 +372,7 @@ export default function ResultScreen() {
               textTransform: 'uppercase',
             }}
           >
-            ♛ Word Pro unlocked
+            {t('result.pro_trial_label')}
           </div>
           <div
             style={{
@@ -376,7 +383,7 @@ export default function ResultScreen() {
               textShadow: '0 0 10px rgba(255,140,66,0.55)',
             }}
           >
-            Free 24-hour trial
+            {t('result.pro_trial_headline')}
           </div>
           <div
             style={{
@@ -388,21 +395,34 @@ export default function ResultScreen() {
               lineHeight: 1.4,
             }}
           >
-            Unlimited replays · all themes
+            {t('result.pro_trial_body')}
           </div>
         </Card>
       )}
 
       <Card surface="table" padding={14} style={{ marginTop: 16 }}>
-        <StatRow label="Words found" value={String(foundWords.length)} />
+        <StatRow
+          label={t('result.words_found')}
+          value={String(foundWords.length)}
+        />
         {longest && (
           <StatRow
-            label="Best word"
+            label={t('result.best_word')}
             value={longest.toUpperCase()}
             highlight
           />
         )}
-        <StatRow label="Longest" value={`${longest.length || 0} letters`} />
+        <StatRow
+          label={t('result.longest')}
+          value={tPlural('result.letters', longest.length || 0)}
+        />
+        {todayStatus.loaded && todayStatus.weeklyRank !== null && (
+          <StatRow
+            label={t('result.weekly_rank')}
+            value={`#${todayStatus.weeklyRank}`}
+            highlight={todayStatus.weeklyRank <= 100}
+          />
+        )}
       </Card>
 
       <SubmitStatusBlock
@@ -431,7 +451,7 @@ export default function ResultScreen() {
           onClick={handleShare}
           disabled={!canShare}
         >
-          Share result
+          {t('result.share')}
         </SaloonButton>
         <div style={{ display: 'flex', gap: 10 }}>
           <SaloonButton
@@ -440,7 +460,7 @@ export default function ResultScreen() {
             onClick={handleGoHome}
             style={{ flex: 1 }}
           >
-            Home
+            {t('result.home')}
           </SaloonButton>
           {needsBuyReplay ? (
             <SaloonButton
@@ -449,7 +469,7 @@ export default function ResultScreen() {
               onClick={handleBuyReplay}
               style={{ flex: 1.4 }}
             >
-              Buy replay · {REPLAY_PRICE_STARS} ⭐
+              {t('home.buy_replay', { price: REPLAY_PRICE_STARS })}
             </SaloonButton>
           ) : (
             <SaloonButton
@@ -459,10 +479,10 @@ export default function ResultScreen() {
               style={{ flex: 1.4 }}
             >
               {proActive
-                ? 'Play another'
+                ? t('result.play_another')
                 : replayCredits !== null && replayCredits > 0
-                  ? `Play replay (${replayCredits})`
-                  : 'Play again'}
+                  ? t('result.play_replay', { n: replayCredits })
+                  : t('result.play_again')}
             </SaloonButton>
           )}
         </div>
@@ -474,9 +494,7 @@ export default function ResultScreen() {
             onClick={handleWatchAd}
             disabled={adInProgress}
           >
-            {adInProgress
-              ? 'Loading ad…'
-              : 'Watch ad → free replay'}
+            {adInProgress ? t('home.ad_loading') : t('home.watch_ad')}
           </SaloonButton>
         )}
         {adError && (
@@ -506,7 +524,7 @@ export default function ResultScreen() {
             marginTop: 4,
           }}
         >
-          ♛ View leaderboard
+          {t('result.view_leaderboard')}
         </button>
       </div>
     </main>
@@ -580,7 +598,7 @@ function SubmitStatusBlock({
           color: 'var(--text-ash)',
         }}
       >
-        Open in Telegram to save your score to the leaderboard.
+        {t('result.open_in_telegram')}
       </p>
     )
   }
@@ -595,7 +613,7 @@ function SubmitStatusBlock({
           color: 'var(--text-parchment-dim)',
         }}
       >
-        Saving to leaderboard…
+        {t('result.saving')}
       </p>
     )
   }
@@ -610,7 +628,7 @@ function SubmitStatusBlock({
           color: 'var(--accent-brass-hi)',
         }}
       >
-        ✓ Saved to leaderboard
+        {t('result.saved')}
       </p>
     )
   }
@@ -640,7 +658,7 @@ function SubmitStatusBlock({
           cursor: 'pointer',
         }}
       >
-        Retry
+        {t('common.retry')}
       </button>
     </div>
   )

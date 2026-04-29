@@ -31,6 +31,9 @@ export interface SubmitSessionPayload {
   // Минуты от UTC, положительный для Восточных. Сервер пишет в users.tz_offset_min,
   // используется daily-reminder для поиска юзеров с локальным 09:00.
   tzOffsetMin?: number
+  // Текущий язык интерфейса юзера ('en' | 'ru'). Сервер пишет в users.language_code,
+  // используется daily-reminder и weekly-prize-distribution для выбора локали DM.
+  languageCode?: string
 }
 
 // streakReward возможные значения:
@@ -141,6 +144,10 @@ export interface TodayStatus {
   bestStreak: number
   proTrialActive: boolean
   proTrialUsed: boolean
+  weekStart: string
+  weekEnd: string
+  weeklyRank: number | null
+  weeklyTotalScore: number | null
 }
 
 interface TodayStatusSuccess extends TodayStatus {
@@ -198,6 +205,96 @@ export async function fetchTodayStatus(
     bestStreak: Number(j.bestStreak ?? 0),
     proTrialActive: Boolean(j.proTrialActive),
     proTrialUsed: Boolean(j.proTrialUsed),
+    weekStart: typeof j.weekStart === 'string' ? j.weekStart : '',
+    weekEnd: typeof j.weekEnd === 'string' ? j.weekEnd : '',
+    weeklyRank:
+      typeof j.weeklyRank === 'number' && Number.isFinite(j.weeklyRank)
+        ? (j.weeklyRank as number)
+        : null,
+    weeklyTotalScore:
+      typeof j.weeklyTotalScore === 'number' && Number.isFinite(j.weeklyTotalScore)
+        ? (j.weeklyTotalScore as number)
+        : null,
+  }
+}
+
+export interface WeeklyEntry {
+  rank: number
+  telegramId: number
+  username: string | null
+  firstName: string | null
+  photoUrl: string | null
+  totalScore: number
+  daysPlayed: number
+  isSelf: boolean
+}
+
+interface WeeklyLeaderboardSuccess {
+  ok: true
+  weekStart: string
+  weekEnd: string
+  prizesDistributed: boolean
+  entries: WeeklyEntry[]
+  selfRank: number | null
+  selfTotalScore: number | null
+}
+
+interface WeeklyLeaderboardFailure {
+  ok: false
+  error: string
+}
+
+export type WeeklyLeaderboardResult =
+  | WeeklyLeaderboardSuccess
+  | WeeklyLeaderboardFailure
+
+export async function fetchWeeklyLeaderboard(
+  initData: string,
+  week: 'current' | 'previous' = 'current',
+): Promise<WeeklyLeaderboardResult> {
+  const url = functionUrl('weekly-leaderboard')
+  const headers = functionHeaders()
+  if (!url || !headers) return { ok: false, error: 'env_missing' }
+
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ initData, week }),
+    })
+  } catch (e) {
+    return { ok: false, error: 'network' + (e ? `:${String(e)}` : '') }
+  }
+
+  let json: unknown
+  try {
+    json = await res.json()
+  } catch {
+    return { ok: false, error: 'bad_response' }
+  }
+
+  const j = (json ?? {}) as Record<string, unknown>
+  if (!res.ok || j.ok !== true) {
+    return { ok: false, error: (j.error as string) ?? 'http_error' }
+  }
+  const entries = Array.isArray(j.entries)
+    ? (j.entries as WeeklyEntry[])
+    : []
+  return {
+    ok: true,
+    weekStart: typeof j.weekStart === 'string' ? j.weekStart : '',
+    weekEnd: typeof j.weekEnd === 'string' ? j.weekEnd : '',
+    prizesDistributed: Boolean(j.prizesDistributed),
+    entries,
+    selfRank:
+      typeof j.selfRank === 'number' && Number.isFinite(j.selfRank)
+        ? (j.selfRank as number)
+        : null,
+    selfTotalScore:
+      typeof j.selfTotalScore === 'number' && Number.isFinite(j.selfTotalScore)
+        ? (j.selfTotalScore as number)
+        : null,
   }
 }
 

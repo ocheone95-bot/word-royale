@@ -16,6 +16,7 @@ import {
   submitSession,
   type StreakRewardType,
 } from '../lib/api'
+import { getLang } from '../lib/i18n'
 import { showRewardedAd } from '../lib/monetag'
 import { track } from '../lib/analytics'
 import { captureMessage } from '../lib/sentry'
@@ -46,6 +47,10 @@ export type TodayStatusState =
       bestStreak: number
       proTrialActive: boolean
       proTrialUsed: boolean
+      weekStart: string
+      weekEnd: string
+      weeklyRank: number | null
+      weeklyTotalScore: number | null
     }
 
 
@@ -327,6 +332,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       score,
       durationSec: GAME_DURATION_SECONDS,
       tzOffsetMin,
+      languageCode: getLang(),
     })
     // Сохраняем уже известный набор тем — submit-score его не возвращает,
     // а перезатирать пустым массивом нельзя, иначе ShopScreen «забудет» owned.
@@ -339,6 +345,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     const prevBestStreak = prevStatus.loaded ? prevStatus.bestStreak : 0
     const prevTrialActive = prevStatus.loaded ? prevStatus.proTrialActive : false
     const prevTrialUsed = prevStatus.loaded ? prevStatus.proTrialUsed : false
+    const prevWeekStart = prevStatus.loaded ? prevStatus.weekStart : ''
+    const prevWeekEnd = prevStatus.loaded ? prevStatus.weekEnd : ''
+    const prevWeeklyRank = prevStatus.loaded ? prevStatus.weeklyRank : null
+    const prevWeeklyTotal = prevStatus.loaded ? prevStatus.weeklyTotalScore : null
     if (result.ok) {
       // Streak-награда + Pro free trial меняют owned themes / proActive — патчим
       // оптимистично, чтобы UI на ResultScreen и MeScreen увидел изменения
@@ -410,6 +420,13 @@ export const useGameStore = create<GameState>((set, get) => ({
           bestStreak: newBestStreak,
           proTrialActive: trialActiveAfter,
           proTrialUsed: trialUsedAfter,
+          weekStart: prevWeekStart,
+          weekEnd: prevWeekEnd,
+          // Weekly rank после новой партии может улучшиться. Точное значение
+          // пересчитает refreshTodayStatus — здесь сохраняем prev, чтобы UI
+          // не мигал «—» между submit и refresh.
+          weeklyRank: prevWeeklyRank,
+          weeklyTotalScore: prevWeeklyTotal,
         },
       })
     } else {
@@ -437,6 +454,10 @@ export const useGameStore = create<GameState>((set, get) => ({
             bestStreak: prevBestStreak,
             proTrialActive: prevTrialActive,
             proTrialUsed: prevTrialUsed,
+            weekStart: prevWeekStart,
+            weekEnd: prevWeekEnd,
+            weeklyRank: prevWeeklyRank,
+            weeklyTotalScore: prevWeeklyTotal,
           },
         })
       } else {
@@ -480,6 +501,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         bestStreak: result.bestStreak,
         proTrialActive: result.proTrialActive,
         proTrialUsed: result.proTrialUsed,
+        weekStart: result.weekStart,
+        weekEnd: result.weekEnd,
+        weeklyRank: result.weeklyRank,
+        weeklyTotalScore: result.weeklyTotalScore,
       },
     })
   },

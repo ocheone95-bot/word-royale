@@ -8,6 +8,7 @@ import { hapticImpact } from '../lib/haptics'
 import { Mostaccio, type MostaccioPose } from '../components/Mostaccio'
 import { PixelLogo } from '../components/PixelLogo'
 import { SaloonButton } from '../components/saloon'
+import { t, useLang } from '../lib/i18n'
 
 interface OnboardingScreenProps {
   onComplete: (reason: 'completed' | 'skipped') => void
@@ -15,29 +16,18 @@ interface OnboardingScreenProps {
 
 interface Slide {
   pose: MostaccioPose
-  title: string
-  body: string
+  titleKey: 'onb.slide1_title' | 'onb.slide2_title' | 'onb.slide3_title'
+  bodyKey: 'onb.slide1_body' | 'onb.slide2_body' | 'onb.slide3_body'
 }
 
 const SLIDES: readonly Slide[] = [
-  {
-    pose: 'smile',
-    title: 'Hi, I’m Mostaccio',
-    body: 'Welcome to the Saloon. Tap letters to make words — longer is better.',
-  },
-  {
-    pose: 'point',
-    title: 'Same letters worldwide',
-    body: 'Every player gets the same 7 letters today. New round at midnight UTC.',
-  },
-  {
-    pose: 'pro',
-    title: 'Climb the leaderboard',
-    body: 'Share your score, beat your friends. The crown is yours to take.',
-  },
+  { pose: 'smile', titleKey: 'onb.slide1_title', bodyKey: 'onb.slide1_body' },
+  { pose: 'point', titleKey: 'onb.slide2_title', bodyKey: 'onb.slide2_body' },
+  { pose: 'pro', titleKey: 'onb.slide3_title', bodyKey: 'onb.slide3_body' },
 ] as const
 
 export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
+  useLang()
   const [step, setStep] = useState(0)
 
   useEffect(() => {
@@ -105,7 +95,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
               WebkitTapHighlightColor: 'transparent',
             }}
           >
-            Skip
+            {t('onb.skip')}
           </button>
         )}
       </div>
@@ -156,7 +146,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
             lineHeight: 1.15,
           }}
         >
-          {slide.title}
+          {t(slide.titleKey)}
         </h2>
         <p
           style={{
@@ -167,7 +157,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
             lineHeight: 1.45,
           }}
         >
-          {slide.body}
+          {t(slide.bodyKey)}
         </p>
       </div>
 
@@ -202,7 +192,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
           fullWidth
           onClick={handleNext}
         >
-          {isLast ? 'Start playing' : 'Next'}
+          {isLast ? t('onb.start') : t('onb.next')}
         </SaloonButton>
       </div>
     </main>

@@ -9,17 +9,9 @@ import type { Bot } from 'grammy';
 import { sendProductInvoice } from './buy.js';
 import { isProductId } from '../products.js';
 import { posthog } from '../posthog.js';
+import { bt, detectBotLang } from '../i18n.js';
 
 const MINI_APP_URL = process.env.MINI_APP_URL ?? 'https://word-royale-miniapp.vercel.app/';
-
-const WELCOME = [
-  '🎮 *Word Royale*',
-  '',
-  'Make as many words as you can from 7 letters in 90 seconds.',
-  'Same puzzle for everyone, every day.',
-  '',
-  'Tap *Play* to start.',
-].join('\n');
 
 export function registerStartHandler(bot: Bot): void {
   bot.command('start', async (ctx) => {
@@ -54,11 +46,13 @@ export function registerStartHandler(bot: Bot): void {
       }
     }
 
-    await ctx.reply(WELCOME, {
+    const lang = detectBotLang(ctx.from?.language_code ?? null);
+    const welcome = `${bt('welcome_title', lang)}\n\n${bt('welcome_body', lang)}`;
+    await ctx.reply(welcome, {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '▶️ Play', web_app: { url: MINI_APP_URL } }],
+          [{ text: bt('play_button', lang), web_app: { url: MINI_APP_URL } }],
         ],
       },
     });

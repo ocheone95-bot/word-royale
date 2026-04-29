@@ -4,6 +4,7 @@
 // или Lucide-иконки если PM захочет.
 
 import type { CSSProperties, ReactNode } from 'react'
+import { t } from '../../lib/i18n'
 
 export type TabKey = 'home' | 'board' | 'shop' | 'me'
 
@@ -13,12 +14,14 @@ interface Tab {
   glyph: ReactNode
 }
 
-const TABS: readonly Tab[] = [
-  { key: 'home', label: 'Home', glyph: '⌂' },
-  { key: 'board', label: 'Board', glyph: '♛' },
-  { key: 'shop', label: 'Shop', glyph: '◆' },
-  { key: 'me', label: 'Me', glyph: '◉' },
-]
+function getTabs(): readonly Tab[] {
+  return [
+    { key: 'home', label: t('tab.home'), glyph: '⌂' },
+    { key: 'board', label: t('tab.board'), glyph: '♛' },
+    { key: 'shop', label: t('tab.shop'), glyph: '◆' },
+    { key: 'me', label: t('tab.me'), glyph: '◉' },
+  ]
+}
 
 interface TabBarProps {
   active: TabKey
@@ -39,12 +42,12 @@ export function TabBar({ active, onChange, className, style }: TabBarProps) {
   }
   return (
     <nav className={className} style={wrap} aria-label="Primary">
-      {TABS.map((t) => (
+      {getTabs().map((tab) => (
         <TabButton
-          key={t.key}
-          tab={t}
-          active={t.key === active}
-          onClick={() => onChange(t.key)}
+          key={tab.key}
+          tab={tab}
+          active={tab.key === active}
+          onClick={() => onChange(tab.key)}
         />
       ))}
     </nav>

@@ -42,6 +42,9 @@ interface SubmitScoreBody {
   // (положительный для Восточных). Используется daily-reminder для поиска
   // юзеров, у которых сейчас 09:00 локально. Валидируется как |offset| <= 14*60.
   tzOffsetMin?: number;
+  // Опционально — текущий язык интерфейса юзера ('en' | 'ru'). Сервер пишет
+  // в users.language_code, daily-reminder и weekly-prize шлют DM на этом языке.
+  languageCode?: string;
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -63,8 +66,16 @@ function isSubmitScoreBody(value: unknown): value is SubmitScoreBody {
     v.wordsFound.every((w) => typeof w === 'string') &&
     typeof v.score === 'number' &&
     typeof v.durationSec === 'number' &&
-    (v.tzOffsetMin === undefined || typeof v.tzOffsetMin === 'number')
+    (v.tzOffsetMin === undefined || typeof v.tzOffsetMin === 'number') &&
+    (v.languageCode === undefined || typeof v.languageCode === 'string')
   );
+}
+
+function sanitizeLanguageCode(value: string | undefined): string | null {
+  if (typeof value !== 'string') return null;
+  const v = value.toLowerCase();
+  if (v === 'en' || v === 'ru') return v;
+  return null;
 }
 
 // Валидный диапазон UTC-оффсета: ±14 часов. Любое значение вне диапазона
@@ -106,6 +117,7 @@ Deno.serve(async (req) => {
   }
   const { initData, dailySeed, letters, wordsFound, score, durationSec } = body;
   const tzOffsetMin = sanitizeTzOffset(body.tzOffsetMin);
+  const languageCode = sanitizeLanguageCode(body.languageCode);
 
   const verified = await verifyInitData(initData, botToken);
   if (!verified) {
@@ -194,6 +206,9 @@ Deno.serve(async (req) => {
   };
   if (tzOffsetMin !== null) {
     userPayload.tz_offset_min = tzOffsetMin;
+  }
+  if (languageCode !== null) {
+    userPayload.language_code = languageCode;
   }
   const { data: userRow, error: userErr } = await supabase
     .from('users')
