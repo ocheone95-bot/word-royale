@@ -281,23 +281,14 @@ export default function ShopScreen() {
         — Mostaccio’s general store —
       </p>
 
-      <Section title={t('shop.replay_section')}>
-        <ShopCard
-          title={t('shop.replay_section')}
-          description={
-            proActive
-              ? t('shop.pro_perks_unlimited')
-              : t('shop.replay_desc')
-          }
-          badge={
-            proActive
-              ? t('shop.theme_active')
-              : replayCredits > 0
-                ? `${replayCredits} ${t('shop.theme_owned')}`
-                : null
-          }
-          buyLabel={t('shop.replay_buy', { price: REPLAY_PRICE_STARS })}
-          onBuy={handleBuyReplay}
+      {/* Pro hero — поднят наверх. Anchoring: юзер видит самую сильную */}
+      {/* ценность ($2.55 безлимит + все темы) первой, Replay в конце как */}
+      {/* отдельный SKU «доиграть один раз». */}
+      <Section title={t('shop.subscription_section')}>
+        <ProCard
+          active={proActive}
+          expiresAt={proExpiresAt}
+          onBuy={handleBuyPro}
         />
       </Section>
 
@@ -327,11 +318,23 @@ export default function ShopScreen() {
         />
       </Section>
 
-      <Section title={t('shop.subscription_section')}>
-        <ProCard
-          active={proActive}
-          expiresAt={proExpiresAt}
-          onBuy={handleBuyPro}
+      <Section title={t('shop.replay_section')}>
+        <ShopCard
+          title={t('shop.replay_section')}
+          description={
+            proActive
+              ? t('shop.pro_perks_unlimited')
+              : t('shop.replay_desc')
+          }
+          badge={
+            proActive
+              ? t('shop.theme_active')
+              : replayCredits > 0
+                ? `${replayCredits} ${t('shop.theme_owned')}`
+                : null
+          }
+          buyLabel={t('shop.replay_buy', { price: REPLAY_PRICE_STARS })}
+          onBuy={handleBuyReplay}
         />
       </Section>
 
