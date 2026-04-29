@@ -403,6 +403,13 @@ export default function ResultScreen() {
           />
         )}
         <StatRow label="Longest" value={`${longest.length || 0} letters`} />
+        {todayStatus.loaded && todayStatus.weeklyRank !== null && (
+          <StatRow
+            label="Weekly rank"
+            value={`#${todayStatus.weeklyRank}`}
+            highlight={todayStatus.weeklyRank <= 100}
+          />
+        )}
       </Card>
 
       <SubmitStatusBlock

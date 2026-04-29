@@ -257,6 +257,32 @@ export default function MeScreen() {
         />
       </Card>
 
+      <SectionTitle>This week</SectionTitle>
+      <Card surface="table" padding={4}>
+        <StatRow
+          label="Tournament rank"
+          value={
+            todayStatus.loaded && todayStatus.weeklyRank !== null
+              ? `#${todayStatus.weeklyRank}`
+              : '—'
+          }
+          highlight={
+            todayStatus.loaded &&
+            todayStatus.weeklyRank !== null &&
+            todayStatus.weeklyRank <= 100
+          }
+        />
+        <StatRow
+          label="Total score"
+          value={
+            todayStatus.loaded && todayStatus.weeklyTotalScore !== null
+              ? todayStatus.weeklyTotalScore.toLocaleString()
+              : '—'
+          }
+          divider={false}
+        />
+      </Card>
+
       <SectionTitle>Membership</SectionTitle>
       <Card surface="table" padding={4}>
         <StatRow

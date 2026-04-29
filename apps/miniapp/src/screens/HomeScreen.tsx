@@ -99,6 +99,8 @@ export default function HomeScreen() {
   const adsWatchedToday = todayStatus.loaded ? todayStatus.adsWatchedToday : 0
   const adsMaxPerDay = todayStatus.loaded ? todayStatus.adsMaxPerDay : 0
   const currentStreak = todayStatus.loaded ? todayStatus.currentStreak : 0
+  const weeklyRank = todayStatus.loaded ? todayStatus.weeklyRank : null
+  const weekEnd = todayStatus.loaded ? todayStatus.weekEnd : ''
   const noFreeNoCredits = playedToday && replayCredits === 0 && !proActive
   const adReplayAvailable =
     noFreeNoCredits &&
@@ -390,6 +392,17 @@ export default function HomeScreen() {
         </p>
       )}
 
+      {weeklyRank !== null && weeklyRank <= 100 && (
+        <WeeklyRankStrip
+          rank={weeklyRank}
+          weekEnd={weekEnd}
+          onClick={() => {
+            hapticImpact('light')
+            showLeaderboard()
+          }}
+        />
+      )}
+
       <div
         style={{
           display: 'flex',
@@ -426,6 +439,106 @@ export default function HomeScreen() {
         </Card>
       </div>
     </main>
+  )
+}
+
+// Полоса «You're #N this week — Xd Yh left». Кликабельная — ведёт на
+// LeaderboardScreen с активным WEEK табом. Видна только если юзер уже
+// в топ-100 текущего турнира.
+function WeeklyRankStrip({
+  rank,
+  weekEnd,
+  onClick,
+}: {
+  rank: number
+  weekEnd: string
+  onClick: () => void
+}) {
+  const [, force] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => force((n) => n + 1), 60_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const remaining = (() => {
+    if (!weekEnd) return ''
+    const ends = new Date(`${weekEnd}T00:00:00Z`).getTime()
+    const ms = ends - Date.now()
+    if (ms <= 0) return ''
+    const totalMin = Math.floor(ms / 60_000)
+    const days = Math.floor(totalMin / (24 * 60))
+    const hours = Math.floor((totalMin - days * 24 * 60) / 60)
+    if (days >= 1) return `${days}d ${hours}h left`
+    return `${hours}h left`
+  })()
+
+  const prizeHint =
+    rank <= 10
+      ? 'Top-10 · 30d Pro on Sun'
+      : 'Top-100 · 5 free replays on Sun'
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        marginTop: 12,
+        width: '100%',
+        background: 'linear-gradient(180deg, var(--bg-leather) 0%, var(--bg-table) 100%)',
+        border: '1px solid var(--accent-brass)',
+        borderRadius: 10,
+        padding: '10px 14px',
+        boxShadow: '0 0 14px rgba(212,168,73,0.25), inset 0 1px 0 rgba(255,255,255,0.05)',
+        color: 'var(--text-parchment)',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        textAlign: 'left',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontWeight: 800,
+              fontSize: 13,
+              color: 'var(--accent-brass-hi)',
+              letterSpacing: 0.4,
+            }}
+          >
+            ♛ You're #{rank} this week
+          </span>
+          <span
+            style={{
+              fontFamily: 'var(--font-pixel)',
+              fontSize: 10,
+              color: 'var(--text-ash)',
+              letterSpacing: 1,
+              textTransform: 'uppercase',
+            }}
+          >
+            {prizeHint}
+            {remaining ? ` · ${remaining}` : ''}
+          </span>
+        </div>
+        <span
+          style={{
+            color: 'var(--accent-lamp)',
+            fontFamily: 'var(--font-pixel)',
+            fontSize: 14,
+          }}
+        >
+          ›
+        </span>
+      </div>
+    </button>
   )
 }
 

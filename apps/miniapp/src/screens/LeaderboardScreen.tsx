@@ -1,13 +1,16 @@
-// Лидерборд за сегодняшний UTC-день. Saloon-redesign: scope toggle pill,
-// top-3 podium с brass-gold gradient у первого места, list rows с
-// "you"-highlight через amber border + lamp-tinted bg.
+// Лидерборд: 3 режима — Friends / Global (за сегодняшний UTC-день) и Week
+// (текущий weekly tournament). Saloon-redesign: scope toggle pill, top-3
+// podium с brass-gold gradient у первого места, list rows с "you"-highlight
+// через amber border + lamp-tinted bg.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRawInitData } from '@telegram-apps/sdk-react'
 import {
   fetchDailyLeaderboard,
   fetchFriendsLeaderboard,
+  fetchWeeklyLeaderboard,
   type LeaderboardEntry,
+  type WeeklyEntry,
 } from '../lib/api'
 import { useGameStore } from '../store/useGameStore'
 import { useTelegramUser } from '../hooks/useTelegramUser'
@@ -21,18 +24,82 @@ import { hapticImpact } from '../lib/haptics'
 import { useDayRollover } from '../hooks/useDayRollover'
 import { Card, SaloonButton, TabBar, type TabKey } from '../components/saloon'
 
-type Mode = 'friends' | 'global'
+type Mode = 'friends' | 'global' | 'week'
+
+interface UiEntry {
+  telegramId: number
+  firstName: string | null
+  username: string | null
+  photoUrl: string | null
+  score: number
+  rank: number
+  isSelf: boolean
+}
 
 type LoadState =
   | { kind: 'loading' }
-  | { kind: 'loaded'; entries: LeaderboardEntry[] }
+  | { kind: 'loaded'; entries: UiEntry[]; meta?: WeekMeta }
   | { kind: 'error' }
 
-function entryName(e: LeaderboardEntry): string {
+interface WeekMeta {
+  weekStart: string
+  weekEnd: string
+  selfRank: number | null
+  selfTotalScore: number | null
+}
+
+function entryName(e: UiEntry): string {
   return (
     e.firstName ||
     (e.username ? `@${e.username}` : `Player ${e.telegramId}`)
   )
+}
+
+function fromDaily(entries: LeaderboardEntry[], meId: number | null): UiEntry[] {
+  return entries.map((e, i) => ({
+    telegramId: e.telegramId,
+    firstName: e.firstName,
+    username: e.username,
+    photoUrl: e.photoUrl,
+    score: e.score,
+    rank: i + 1,
+    isSelf: meId === e.telegramId,
+  }))
+}
+
+function fromWeekly(entries: WeeklyEntry[]): UiEntry[] {
+  return entries.map((e) => ({
+    telegramId: e.telegramId,
+    firstName: e.firstName,
+    username: e.username,
+    photoUrl: e.photoUrl,
+    score: e.totalScore,
+    rank: e.rank,
+    isSelf: e.isSelf,
+  }))
+}
+
+function formatWeekRange(weekStart: string, weekEnd: string): string {
+  if (!weekStart || !weekEnd) return ''
+  const start = new Date(`${weekStart}T00:00:00Z`)
+  // weekEnd exclusive (Mon next), показываем последний день недели = Sun
+  const end = new Date(`${weekEnd}T00:00:00Z`)
+  end.setUTCDate(end.getUTCDate() - 1)
+  const fmt = (d: Date): string =>
+    `${d.toLocaleString('en', { month: 'short', timeZone: 'UTC' })} ${d.getUTCDate()}`
+  return `${fmt(start)} – ${fmt(end)}`
+}
+
+function timeUntilWeekEnd(weekEnd: string): string {
+  if (!weekEnd) return ''
+  const ends = new Date(`${weekEnd}T00:00:00Z`).getTime()
+  const remaining = ends - Date.now()
+  if (remaining <= 0) return ''
+  const totalMin = Math.floor(remaining / 60000)
+  const days = Math.floor(totalMin / (24 * 60))
+  const hours = Math.floor((totalMin - days * 24 * 60) / 60)
+  if (days >= 1) return `${days}d ${hours}h left`
+  return `${hours}h left`
 }
 
 export default function LeaderboardScreen() {
@@ -45,6 +112,7 @@ export default function LeaderboardScreen() {
   const [mode, setMode] = useState<Mode>('friends')
   const [globalState, setGlobalState] = useState<LoadState>({ kind: 'loading' })
   const [friendsState, setFriendsState] = useState<LoadState>({ kind: 'loading' })
+  const [weekState, setWeekState] = useState<LoadState>({ kind: 'loading' })
 
   useDayRollover(initData ?? undefined)
 
@@ -53,7 +121,11 @@ export default function LeaderboardScreen() {
     setGlobalState({ kind: 'loading' })
     fetchDailyLeaderboard(seed)
       .then((entries) => {
-        if (!cancelled) setGlobalState({ kind: 'loaded', entries })
+        if (!cancelled)
+          setGlobalState({
+            kind: 'loaded',
+            entries: fromDaily(entries, tgUser?.id ?? null),
+          })
       })
       .catch(() => {
         if (!cancelled) setGlobalState({ kind: 'error' })
@@ -61,7 +133,7 @@ export default function LeaderboardScreen() {
     return () => {
       cancelled = true
     }
-  }, [seed])
+  }, [seed, tgUser?.id])
 
   useEffect(() => {
     if (mode !== 'friends') return
@@ -71,7 +143,11 @@ export default function LeaderboardScreen() {
     fetchFriendsLeaderboard(initData, seed)
       .then((res) => {
         if (cancelled) return
-        if (res.ok) setFriendsState({ kind: 'loaded', entries: res.entries })
+        if (res.ok)
+          setFriendsState({
+            kind: 'loaded',
+            entries: fromDaily(res.entries, tgUser?.id ?? null),
+          })
         else setFriendsState({ kind: 'error' })
       })
       .catch(() => {
@@ -80,9 +156,39 @@ export default function LeaderboardScreen() {
     return () => {
       cancelled = true
     }
-  }, [mode, initData, seed])
+  }, [mode, initData, seed, tgUser?.id])
 
-  const state = mode === 'global' ? globalState : friendsState
+  useEffect(() => {
+    if (mode !== 'week') return
+    if (!initData) return
+    let cancelled = false
+    setWeekState({ kind: 'loading' })
+    fetchWeeklyLeaderboard(initData, 'current')
+      .then((res) => {
+        if (cancelled) return
+        if (res.ok) {
+          setWeekState({
+            kind: 'loaded',
+            entries: fromWeekly(res.entries),
+            meta: {
+              weekStart: res.weekStart,
+              weekEnd: res.weekEnd,
+              selfRank: res.selfRank,
+              selfTotalScore: res.selfTotalScore,
+            },
+          })
+        } else setWeekState({ kind: 'error' })
+      })
+      .catch(() => {
+        if (!cancelled) setWeekState({ kind: 'error' })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [mode, initData])
+
+  const state =
+    mode === 'global' ? globalState : mode === 'week' ? weekState : friendsState
 
   const handleInvite = () => {
     hapticImpact('light')
@@ -107,6 +213,12 @@ export default function LeaderboardScreen() {
     else if (key === 'shop') showShop()
     else if (key === 'me') showMe()
   }
+
+  const headerLabel = useMemo(() => {
+    if (mode !== 'week') return seed
+    if (weekState.kind !== 'loaded' || !weekState.meta) return ''
+    return formatWeekRange(weekState.meta.weekStart, weekState.meta.weekEnd)
+  }, [mode, seed, weekState])
 
   return (
     <main
@@ -165,7 +277,7 @@ export default function LeaderboardScreen() {
             letterSpacing: 1,
           }}
         >
-          {seed}
+          {headerLabel}
         </span>
       </header>
 
@@ -192,7 +304,17 @@ export default function LeaderboardScreen() {
         >
           Global
         </ToggleSegment>
+        <ToggleSegment
+          active={mode === 'week'}
+          onClick={() => handleSetMode('week')}
+        >
+          Week
+        </ToggleSegment>
       </div>
+
+      {mode === 'week' && weekState.kind === 'loaded' && weekState.meta && (
+        <WeekBanner meta={weekState.meta} />
+      )}
 
       {state.kind === 'loading' && (
         <p
@@ -225,10 +347,7 @@ export default function LeaderboardScreen() {
       )}
 
       {state.kind === 'loaded' && state.entries.length >= 3 && (
-        <Podium
-          entries={state.entries.slice(0, 3)}
-          meId={tgUser?.id ?? null}
-        />
+        <Podium entries={state.entries.slice(0, 3)} mode={mode} />
       )}
 
       {state.kind === 'loaded' && state.entries.length > 0 && (
@@ -243,11 +362,9 @@ export default function LeaderboardScreen() {
           }}
         >
           {(state.entries.length >= 3 ? state.entries.slice(3) : state.entries).map(
-            (entry, idx) => {
-              const rank = state.entries.length >= 3 ? idx + 4 : idx + 1
-              const isMe = tgUser?.id === entry.telegramId
-              return <ListRow key={entry.telegramId} entry={entry} rank={rank} isMe={isMe} />
-            },
+            (entry) => (
+              <ListRow key={`${entry.telegramId}-${entry.rank}`} entry={entry} mode={mode} />
+            ),
           )}
         </ol>
       )}
@@ -286,11 +403,11 @@ function ToggleSegment({
         background: active ? 'var(--accent-lamp)' : 'transparent',
         color: active ? 'var(--text-charcoal)' : 'var(--text-parchment-dim)',
         border: 'none',
-        padding: '7px 22px',
+        padding: '7px 18px',
         borderRadius: 999,
         fontFamily: 'var(--font-ui)',
         fontWeight: 800,
-        fontSize: 13,
+        fontSize: 12,
         textTransform: 'uppercase',
         letterSpacing: 1,
         boxShadow: active ? '0 0 12px rgba(255,140,66,0.6)' : 'none',
@@ -304,16 +421,81 @@ function ToggleSegment({
   )
 }
 
+function WeekBanner({ meta }: { meta: WeekMeta }) {
+  const remaining = timeUntilWeekEnd(meta.weekEnd)
+  return (
+    <div style={{ marginTop: 14 }}>
+      <Card surface="leather" padding={12} bordered>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            textAlign: 'center',
+          }}
+        >
+          <span
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontWeight: 800,
+              fontSize: 11,
+              letterSpacing: 1.5,
+              textTransform: 'uppercase',
+              color: 'var(--accent-brass)',
+            }}
+          >
+            ♛ Tournament prizes
+          </span>
+          <span
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 12,
+              color: 'var(--text-parchment)',
+              fontWeight: 600,
+            }}
+          >
+            Top-10 → 30 days Word Pro · Top-100 → 5 free replays
+          </span>
+          {remaining && (
+            <span
+              style={{
+                fontFamily: 'var(--font-pixel)',
+                fontSize: 11,
+                color: 'var(--text-ash)',
+                letterSpacing: 1,
+              }}
+            >
+              Ends Sun 23:59 UTC · {remaining}
+            </span>
+          )}
+          {meta.selfRank !== null && (
+            <span
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontWeight: 700,
+                fontSize: 12,
+                color: 'var(--accent-lamp)',
+                marginTop: 4,
+              }}
+            >
+              You: #{meta.selfRank} · {meta.selfTotalScore ?? 0} pts
+            </span>
+          )}
+        </div>
+      </Card>
+    </div>
+  )
+}
+
 function Podium({
   entries,
-  meId,
+  mode,
 }: {
-  entries: readonly LeaderboardEntry[]
-  meId: number | null
+  entries: readonly UiEntry[]
+  mode: Mode
 }) {
-  // Order on screen: 2nd (left) · 1st (center, taller) · 3rd (right)
   const [first, second, third] = entries
-  const order: Array<{ entry: LeaderboardEntry; rank: 1 | 2 | 3 }> = [
+  const order: Array<{ entry: UiEntry; rank: 1 | 2 | 3 }> = [
     { entry: second, rank: 2 },
     { entry: first, rank: 1 },
     { entry: third, rank: 3 },
@@ -333,7 +515,7 @@ function Podium({
           key={entry.telegramId}
           entry={entry}
           rank={rank}
-          isMe={meId === entry.telegramId}
+          mode={mode}
         />
       ))}
     </div>
@@ -343,11 +525,11 @@ function Podium({
 function PodiumColumn({
   entry,
   rank,
-  isMe,
+  mode,
 }: {
-  entry: LeaderboardEntry
+  entry: UiEntry
   rank: 1 | 2 | 3
-  isMe: boolean
+  mode: Mode
 }) {
   const barHeight = rank === 1 ? 84 : rank === 2 ? 60 : 48
   const barBg =
@@ -370,7 +552,7 @@ function PodiumColumn({
       <span
         style={{
           fontSize: 11,
-          color: isMe ? 'var(--accent-lamp)' : 'var(--text-parchment)',
+          color: entry.isSelf ? 'var(--accent-lamp)' : 'var(--text-parchment)',
           fontFamily: 'var(--font-ui)',
           fontWeight: 700,
           maxWidth: '100%',
@@ -379,7 +561,7 @@ function PodiumColumn({
           whiteSpace: 'nowrap',
         }}
       >
-        {isMe ? 'You' : entryName(entry)}
+        {entry.isSelf ? 'You' : entryName(entry)}
       </span>
       <span
         style={{
@@ -390,6 +572,18 @@ function PodiumColumn({
         }}
       >
         {entry.score}
+        {mode === 'week' && (
+          <span
+            style={{
+              fontSize: 9,
+              color: 'var(--text-ash)',
+              marginLeft: 3,
+              letterSpacing: 0.5,
+            }}
+          >
+            pts
+          </span>
+        )}
       </span>
       <div
         style={{
@@ -426,7 +620,7 @@ function Avatar({
   entry,
   large = false,
 }: {
-  entry: LeaderboardEntry
+  entry: UiEntry
   large?: boolean
 }) {
   const size = large ? 44 : 32
@@ -461,15 +655,8 @@ function Avatar({
   return <span style={wrap}>{initial}</span>
 }
 
-function ListRow({
-  entry,
-  rank,
-  isMe,
-}: {
-  entry: LeaderboardEntry
-  rank: number
-  isMe: boolean
-}) {
+function ListRow({ entry, mode }: { entry: UiEntry; mode: Mode }) {
+  const isMe = entry.isSelf
   return (
     <li
       style={{
@@ -484,14 +671,14 @@ function ListRow({
     >
       <span
         style={{
-          width: 18,
+          width: 24,
           textAlign: 'right',
           fontFamily: 'var(--font-pixel)',
           fontSize: 14,
           color: isMe ? 'var(--accent-lamp)' : 'var(--text-ash)',
         }}
       >
-        {rank}
+        {entry.rank}
       </span>
       <Avatar entry={entry} />
       <span
@@ -518,6 +705,18 @@ function ListRow({
         }}
       >
         {entry.score}
+        {mode === 'week' && (
+          <span
+            style={{
+              fontSize: 9,
+              color: 'var(--text-ash)',
+              marginLeft: 3,
+              letterSpacing: 0.5,
+            }}
+          >
+            pts
+          </span>
+        )}
       </span>
     </li>
   )
@@ -535,6 +734,20 @@ function EmptyState({ mode, onInvite }: { mode: Mode; onInvite: () => void }) {
         }}
       >
         No scores yet today. Be the first.
+      </p>
+    )
+  }
+  if (mode === 'week') {
+    return (
+      <p
+        style={{
+          textAlign: 'center',
+          marginTop: 30,
+          color: 'var(--text-parchment-dim)',
+          fontSize: 13,
+        }}
+      >
+        New tournament. Be the first to score.
       </p>
     )
   }

@@ -301,3 +301,12 @@ verify_jwt = false
 [functions.me-stats]
 # Та же история, что и у submit-score.
 verify_jwt = false
+
+[functions.weekly-leaderboard]
+# Та же история, что и у submit-score.
+verify_jwt = false
+
+[functions.weekly-prize-distribution]
+# Cron-only функция: вызывается раз в неделю воскресной ночью с заголовком
+# Authorization: Bearer ${CRON_SECRET}. Без обычной initData-аутентификации.
+verify_jwt = false

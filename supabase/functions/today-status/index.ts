@@ -16,6 +16,10 @@
 //     bestStreak: number,           // лучшая серия за всё время
 //     proTrialActive: boolean,      // free trial активен сейчас (выдан < 24h назад и proActive)
 //     proTrialUsed: boolean,        // юзер когда-либо получал trial (для UI «trial expired»)
+//     weekStart: string,            // понедельник текущей недели в UTC (YYYY-MM-DD)
+//     weekEnd: string,              // следующий понедельник (exclusive)
+//     weeklyRank: number | null,    // позиция в недельном турнире (null если не играл)
+//     weeklyTotalScore: number | null, // сумма лучших скоров по дням недели
 //   }
 //
 // Используется HomeScreen / ResultScreen / ShopScreen — для подсветки купленных
@@ -52,6 +56,12 @@ function isBody(value: unknown): value is Body {
   if (!value || typeof value !== 'object') return false;
   const v = value as Record<string, unknown>;
   return typeof v.initData === 'string' && typeof v.dailySeed === 'string';
+}
+
+function addDaysIso(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 Deno.serve(async (req) => {
@@ -108,6 +118,9 @@ Deno.serve(async (req) => {
 
   // Юзер ещё не появлялся — соответственно, ничего не играл, кредитов и тем нет.
   if (!meRow) {
+    const { data: weekStartData } = await supabase.rpc('current_week_start');
+    const ws = String(weekStartData ?? '');
+    const we = ws ? addDaysIso(ws, 7) : '';
     return jsonResponse(200, {
       ok: true,
       playedToday: false,
@@ -123,6 +136,10 @@ Deno.serve(async (req) => {
       bestStreak: 0,
       proTrialActive: false,
       proTrialUsed: false,
+      weekStart: ws,
+      weekEnd: we,
+      weeklyRank: null,
+      weeklyTotalScore: null,
     });
   }
 
@@ -130,6 +147,8 @@ Deno.serve(async (req) => {
     { count, error: countErr },
     { data: themesRows, error: themesErr },
     { data: proRow, error: proErr },
+    { data: weeklyRows, error: weeklyErr },
+    { data: weekStartData, error: weekStartErr },
   ] = await Promise.all([
     supabase
       .from('game_sessions')
@@ -144,6 +163,8 @@ Deno.serve(async (req) => {
       .eq('user_id', meRow.id)
       .eq('tier', 'pro')
       .maybeSingle(),
+    supabase.rpc('get_user_weekly_rank', { p_user_id: meRow.id }),
+    supabase.rpc('current_week_start'),
   ]);
   if (countErr) {
     return jsonResponse(500, {
@@ -164,6 +185,20 @@ Deno.serve(async (req) => {
       ok: false,
       error: 'subscription_lookup_failed',
       detail: proErr.message,
+    });
+  }
+  if (weeklyErr) {
+    return jsonResponse(500, {
+      ok: false,
+      error: 'weekly_rank_lookup_failed',
+      detail: weeklyErr.message,
+    });
+  }
+  if (weekStartErr) {
+    return jsonResponse(500, {
+      ok: false,
+      error: 'week_start_lookup_failed',
+      detail: weekStartErr.message,
     });
   }
 
@@ -208,6 +243,12 @@ Deno.serve(async (req) => {
     trialGrantedAt !== null &&
     new Date(trialGrantedAt).getTime() + 24 * 60 * 60 * 1000 > Date.now();
 
+  type WeeklyRow = { rank: number; total_score: number; days_played: number };
+  const weeklyArr = (weeklyRows ?? []) as WeeklyRow[];
+  const weeklyRow = weeklyArr.length > 0 ? weeklyArr[0] : null;
+  const weekStart = String(weekStartData ?? '');
+  const weekEnd = weekStart ? addDaysIso(weekStart, 7) : '';
+
   return jsonResponse(200, {
     ok: true,
     playedToday,
@@ -224,5 +265,9 @@ Deno.serve(async (req) => {
     bestStreak: (meRow.best_streak as number) ?? 0,
     proTrialActive,
     proTrialUsed,
+    weekStart,
+    weekEnd,
+    weeklyRank: weeklyRow ? weeklyRow.rank : null,
+    weeklyTotalScore: weeklyRow ? weeklyRow.total_score : null,
   });
 });
