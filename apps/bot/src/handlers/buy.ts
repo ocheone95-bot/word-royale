@@ -79,6 +79,8 @@ export async function sendReplayInvoice(ctx: Context): Promise<void> {
 
 export function registerBuyHandlers(bot: Bot): void {
   bot.command('buy_replay', sendReplayInvoice);
+  bot.command('buy_replay_8', (ctx) => sendProductInvoice(ctx, 'replay_8'));
+  bot.command('buy_replay_12', (ctx) => sendProductInvoice(ctx, 'replay_12'));
   bot.command('buy_double_score', (ctx) => sendProductInvoice(ctx, 'double_score'));
   bot.command('buy_pro', (ctx) => sendProductInvoice(ctx, 'pro_subscription'));
   for (const themeId of THEME_IDS) {
