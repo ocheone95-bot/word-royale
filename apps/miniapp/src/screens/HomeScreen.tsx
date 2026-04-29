@@ -24,7 +24,7 @@ import { useViewportWidth } from '../hooks/useViewportWidth'
 import { useDayRollover } from '../hooks/useDayRollover'
 import { Mostaccio } from '../components/Mostaccio'
 import { PixelLogo } from '../components/PixelLogo'
-import { t, tPlural, useLang } from '../lib/i18n'
+import { getLang, t, tPlural, useLang } from '../lib/i18n'
 import {
   Card,
   LetterTile,
@@ -338,7 +338,7 @@ export default function HomeScreen() {
             justifyContent: 'center',
             gap: 5,
             marginTop: 14,
-            marginBottom: 14,
+            marginBottom: getLang() === 'ru' ? 6 : 14,
             flexWrap: 'wrap',
           }}
         >
@@ -346,6 +346,21 @@ export default function HomeScreen() {
             <LetterTile key={i} letter={l} size={32} />
           ))}
         </div>
+        {getLang() === 'ru' && (
+          <p
+            style={{
+              fontFamily: 'var(--font-pixel)',
+              fontSize: 10,
+              color: 'var(--text-ash)',
+              letterSpacing: 1,
+              textAlign: 'center',
+              margin: '0 0 12px 0',
+              lineHeight: 1.3,
+            }}
+          >
+            {t('home.english_letters_hint')}
+          </p>
+        )}
 
         {noFreeNoCredits ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
