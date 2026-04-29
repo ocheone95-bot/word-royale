@@ -28,6 +28,9 @@ export interface SubmitSessionPayload {
   wordsFound: string[]
   score: number
   durationSec: number
+  // Минуты от UTC, положительный для Восточных. Сервер пишет в users.tz_offset_min,
+  // используется daily-reminder для поиска юзеров с локальным 09:00.
+  tzOffsetMin?: number
 }
 
 // streakReward возможные значения:

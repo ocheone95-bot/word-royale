@@ -38,6 +38,10 @@ interface SubmitScoreBody {
   wordsFound: string[];
   score: number;
   durationSec: number;
+  // Опционально — минуты от UTC, как `-new Date().getTimezoneOffset()`
+  // (положительный для Восточных). Используется daily-reminder для поиска
+  // юзеров, у которых сейчас 09:00 локально. Валидируется как |offset| <= 14*60.
+  tzOffsetMin?: number;
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -58,8 +62,19 @@ function isSubmitScoreBody(value: unknown): value is SubmitScoreBody {
     Array.isArray(v.wordsFound) &&
     v.wordsFound.every((w) => typeof w === 'string') &&
     typeof v.score === 'number' &&
-    typeof v.durationSec === 'number'
+    typeof v.durationSec === 'number' &&
+    (v.tzOffsetMin === undefined || typeof v.tzOffsetMin === 'number')
   );
+}
+
+// Валидный диапазон UTC-оффсета: ±14 часов. Любое значение вне диапазона
+// считаем мусорным (битый клиент или подмена) и игнорируем — на уровне БД
+// колонка остаётся как была.
+function sanitizeTzOffset(value: number | undefined): number | null {
+  if (value === undefined || !Number.isFinite(value)) return null;
+  const rounded = Math.round(value);
+  if (Math.abs(rounded) > 14 * 60) return null;
+  return rounded;
 }
 
 Deno.serve(async (req) => {
@@ -90,6 +105,7 @@ Deno.serve(async (req) => {
     return jsonResponse(400, { ok: false, error: 'invalid_body' });
   }
   const { initData, dailySeed, letters, wordsFound, score, durationSec } = body;
+  const tzOffsetMin = sanitizeTzOffset(body.tzOffsetMin);
 
   const verified = await verifyInitData(initData, botToken);
   if (!verified) {
@@ -169,18 +185,19 @@ Deno.serve(async (req) => {
   }
 
   const tg = verified.user;
+  const userPayload: Record<string, unknown> = {
+    telegram_id: tg.id,
+    username: tg.username ?? null,
+    first_name: tg.first_name ?? null,
+    photo_url: tg.photo_url ?? null,
+    last_active_at: new Date().toISOString(),
+  };
+  if (tzOffsetMin !== null) {
+    userPayload.tz_offset_min = tzOffsetMin;
+  }
   const { data: userRow, error: userErr } = await supabase
     .from('users')
-    .upsert(
-      {
-        telegram_id: tg.id,
-        username: tg.username ?? null,
-        first_name: tg.first_name ?? null,
-        photo_url: tg.photo_url ?? null,
-        last_active_at: new Date().toISOString(),
-      },
-      { onConflict: 'telegram_id', ignoreDuplicates: false },
-    )
+    .upsert(userPayload, { onConflict: 'telegram_id', ignoreDuplicates: false })
     .select('id')
     .single();
   if (userErr || !userRow) {

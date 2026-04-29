@@ -305,6 +305,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { seed, letters, foundWords, score, submitStatus } = get()
     if (submitStatus === 'submitting' || submitStatus === 'success') return
     set({ submitStatus: 'submitting', submitError: null })
+    // Telegram WebApp работает в обычном браузере, поэтому Date знает
+    // системный tz. Перегоняем в «минуты от UTC, положительный для Восточных».
+    // Москва UTC+3 → JS getTimezoneOffset() = -180 → tzOffsetMin = +180.
+    const tzOffsetMin =
+      typeof Date !== 'undefined'
+        ? -new Date().getTimezoneOffset()
+        : undefined
     const result = await submitSession({
       initData,
       dailySeed: seed,
@@ -312,6 +319,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       wordsFound: foundWords,
       score,
       durationSec: GAME_DURATION_SECONDS,
+      tzOffsetMin,
     })
     // Сохраняем уже известный набор тем — submit-score его не возвращает,
     // а перезатирать пустым массивом нельзя, иначе ShopScreen «забудет» owned.
