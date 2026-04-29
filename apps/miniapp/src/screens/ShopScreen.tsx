@@ -409,7 +409,9 @@ function ProHero({ active, expiresAt, onBuy }: ProHeroProps) {
           pointerEvents: 'none',
         }}
       />
-      <CrownGlyph />
+      <div style={{ position: 'absolute', top: 14, right: 14 }}>
+        <ProBadge />
+      </div>
 
       <div
         style={{
@@ -473,31 +475,6 @@ function ProHero({ active, expiresAt, onBuy }: ProHeroProps) {
         </SaloonButton>
       )}
     </div>
-  )
-}
-
-// Pixel-корона в углу Pro-карточки. SVG с glow.
-function CrownGlyph() {
-  return (
-    <svg
-      width="28"
-      height="22"
-      viewBox="0 0 28 22"
-      style={{
-        position: 'absolute',
-        top: 14,
-        right: 16,
-        filter: 'drop-shadow(0 0 6px rgba(212,168,73,0.6))',
-      }}
-      aria-hidden
-    >
-      <path
-        d="M2 8 L2 18 L26 18 L26 8 L20 12 L14 4 L8 12 Z"
-        fill="var(--accent-brass-hi)"
-        stroke="var(--accent-brass)"
-        strokeWidth="1"
-      />
-    </svg>
   )
 }
 
