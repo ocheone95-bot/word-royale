@@ -5,6 +5,7 @@ import { Bot } from 'grammy';
 import { registerStartHandler } from './handlers/start.js';
 import { registerBuyHandlers } from './handlers/buy.js';
 import { registerPaymentHandlers } from './handlers/payment.js';
+import { registerNotificationsHandlers } from './handlers/notifications.js';
 
 export function createBot(token: string): Bot {
   const bot = new Bot(token);
@@ -12,6 +13,7 @@ export function createBot(token: string): Bot {
   registerStartHandler(bot);
   registerBuyHandlers(bot);
   registerPaymentHandlers(bot);
+  registerNotificationsHandlers(bot);
 
   return bot;
 }

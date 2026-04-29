@@ -38,6 +38,10 @@ interface SubmitScoreBody {
   wordsFound: string[];
   score: number;
   durationSec: number;
+  // Опционально — минуты от UTC, как `-new Date().getTimezoneOffset()`
+  // (положительный для Восточных). Используется daily-reminder для поиска
+  // юзеров, у которых сейчас 09:00 локально. Валидируется как |offset| <= 14*60.
+  tzOffsetMin?: number;
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -58,8 +62,19 @@ function isSubmitScoreBody(value: unknown): value is SubmitScoreBody {
     Array.isArray(v.wordsFound) &&
     v.wordsFound.every((w) => typeof w === 'string') &&
     typeof v.score === 'number' &&
-    typeof v.durationSec === 'number'
+    typeof v.durationSec === 'number' &&
+    (v.tzOffsetMin === undefined || typeof v.tzOffsetMin === 'number')
   );
+}
+
+// Валидный диапазон UTC-оффсета: ±14 часов. Любое значение вне диапазона
+// считаем мусорным (битый клиент или подмена) и игнорируем — на уровне БД
+// колонка остаётся как была.
+function sanitizeTzOffset(value: number | undefined): number | null {
+  if (value === undefined || !Number.isFinite(value)) return null;
+  const rounded = Math.round(value);
+  if (Math.abs(rounded) > 14 * 60) return null;
+  return rounded;
 }
 
 Deno.serve(async (req) => {
@@ -90,6 +105,7 @@ Deno.serve(async (req) => {
     return jsonResponse(400, { ok: false, error: 'invalid_body' });
   }
   const { initData, dailySeed, letters, wordsFound, score, durationSec } = body;
+  const tzOffsetMin = sanitizeTzOffset(body.tzOffsetMin);
 
   const verified = await verifyInitData(initData, botToken);
   if (!verified) {
@@ -169,18 +185,19 @@ Deno.serve(async (req) => {
   }
 
   const tg = verified.user;
+  const userPayload: Record<string, unknown> = {
+    telegram_id: tg.id,
+    username: tg.username ?? null,
+    first_name: tg.first_name ?? null,
+    photo_url: tg.photo_url ?? null,
+    last_active_at: new Date().toISOString(),
+  };
+  if (tzOffsetMin !== null) {
+    userPayload.tz_offset_min = tzOffsetMin;
+  }
   const { data: userRow, error: userErr } = await supabase
     .from('users')
-    .upsert(
-      {
-        telegram_id: tg.id,
-        username: tg.username ?? null,
-        first_name: tg.first_name ?? null,
-        photo_url: tg.photo_url ?? null,
-        last_active_at: new Date().toISOString(),
-      },
-      { onConflict: 'telegram_id', ignoreDuplicates: false },
-    )
+    .upsert(userPayload, { onConflict: 'telegram_id', ignoreDuplicates: false })
     .select('id')
     .single();
   if (userErr || !userRow) {
@@ -220,6 +237,8 @@ Deno.serve(async (req) => {
     result_code: string;
     score_applied: number | null;
     double_score_used: boolean | null;
+    current_streak: number | null;
+    streak_milestone_reached: number | null;
   };
   if (result.result_code === 'no_replay') {
     return jsonResponse(403, {
@@ -248,6 +267,28 @@ Deno.serve(async (req) => {
     // ignore
   }
 
+  // Streak-награда: insert_game_session помечает streak_milestone_reached>0,
+  // когда юзер впервые перешагнул 3/7/30 day-порог. claim_streak_reward
+  // атомарно начисляет (replay credit / тема / Pro 30d) с idempotency-check
+  // через last_streak_milestone_reached. Ошибки не фатальны для submit-score.
+  let streakReward: string | null = null;
+  const milestoneReached = result.streak_milestone_reached ?? 0;
+  if (milestoneReached > 0) {
+    try {
+      const { data: rewardRows } = await supabase.rpc('claim_streak_reward', {
+        p_user_id: userRow.id,
+        p_milestone: milestoneReached,
+      });
+      const rewardRow =
+        Array.isArray(rewardRows) && rewardRows.length > 0 ? rewardRows[0] : null;
+      if (rewardRow && (rewardRow as { granted?: boolean }).granted) {
+        streakReward = (rewardRow as { reward_type?: string | null }).reward_type ?? null;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   // score_applied = expectedScore × 2, если double_score_used=true. Возвращаем
   // клиенту его, чтобы UI и лидерборд показали один и тот же финальный счёт.
   return jsonResponse(200, {
@@ -258,5 +299,8 @@ Deno.serve(async (req) => {
     wasReplay: result.was_replay ?? false,
     replayCreditsLeft: result.replay_credits_left ?? 0,
     doubleScoreUsed: result.double_score_used ?? false,
+    currentStreak: result.current_streak ?? 0,
+    streakMilestoneReached: milestoneReached,
+    streakReward,
   });
 });

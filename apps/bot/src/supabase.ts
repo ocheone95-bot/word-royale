@@ -137,6 +137,20 @@ export async function revokePurchase(params: {
   };
 }
 
+// Включает/выключает daily-reminder push для юзера. Возвращает true, если
+// нашли и обновили строку (false — юзера ещё нет, /start не делал).
+export async function setNotificationsEnabled(params: {
+  telegramId: number;
+  enabled: boolean;
+}): Promise<boolean> {
+  const { data, error } = await getSupabase().rpc('set_notifications_enabled', {
+    p_telegram_id: params.telegramId,
+    p_enabled: params.enabled,
+  });
+  if (error) throw error;
+  return Boolean(data);
+}
+
 // Атомарно: upsert юзера + запись в purchases + idempotent insert в user_themes.
 // Возвращает was_new=false, если этот telegram_payment_id уже обрабатывался.
 export async function grantTheme(params: {

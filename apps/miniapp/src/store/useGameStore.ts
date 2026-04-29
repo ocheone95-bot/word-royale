@@ -10,7 +10,12 @@ import {
   type DailySeed,
   type Letters,
 } from '@word-royale/shared'
-import { fetchTodayStatus, recordAdReward, submitSession } from '../lib/api'
+import {
+  fetchTodayStatus,
+  recordAdReward,
+  submitSession,
+  type StreakRewardType,
+} from '../lib/api'
 import { showRewardedAd } from '../lib/monetag'
 import { track } from '../lib/analytics'
 import { captureMessage } from '../lib/sentry'
@@ -37,6 +42,8 @@ export type TodayStatusState =
       proExpiresAt: string | null
       adsWatchedToday: number
       adsMaxPerDay: number
+      currentStreak: number
+      bestStreak: number
     }
 
 
@@ -96,6 +103,11 @@ interface GameState {
   serverScore: number | null
   // boost ×2 потрачен на этой сессии — UI покажет «×2 applied» рядом со счётом
   doubleScoreApplied: boolean
+  // Достигнутый порог streak (3/7/30) после insert — 0 если не пересечён
+  streakMilestoneReached: number
+  // Тип выданной награды (replay_credit/theme_neon/pro_30d) или null если RPC
+  // не выдала (race с другой сессией) — UI показывает соответствующий toast.
+  streakReward: StreakRewardType | null
 
   // статус юзера на сегодня — играл ли уже и сколько replay-токенов
   todayStatus: TodayStatusState
@@ -144,6 +156,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   submitError: null,
   serverScore: null,
   doubleScoreApplied: false,
+  streakMilestoneReached: 0,
+  streakReward: null,
 
   todayStatus: { loaded: false },
 
@@ -205,6 +219,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       submitError: null,
       serverScore: null,
       doubleScoreApplied: false,
+      streakMilestoneReached: 0,
+      streakReward: null,
     })
   },
 
@@ -289,6 +305,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { seed, letters, foundWords, score, submitStatus } = get()
     if (submitStatus === 'submitting' || submitStatus === 'success') return
     set({ submitStatus: 'submitting', submitError: null })
+    // Telegram WebApp работает в обычном браузере, поэтому Date знает
+    // системный tz. Перегоняем в «минуты от UTC, положительный для Восточных».
+    // Москва UTC+3 → JS getTimezoneOffset() = -180 → tzOffsetMin = +180.
+    const tzOffsetMin =
+      typeof Date !== 'undefined'
+        ? -new Date().getTimezoneOffset()
+        : undefined
     const result = await submitSession({
       initData,
       dailySeed: seed,
@@ -296,6 +319,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       wordsFound: foundWords,
       score,
       durationSec: GAME_DURATION_SECONDS,
+      tzOffsetMin,
     })
     // Сохраняем уже известный набор тем — submit-score его не возвращает,
     // а перезатирать пустым массивом нельзя, иначе ShopScreen «забудет» owned.
@@ -305,12 +329,40 @@ export const useGameStore = create<GameState>((set, get) => ({
     const prevProExpires = prevStatus.loaded ? prevStatus.proExpiresAt : null
     const prevAdsCount = prevStatus.loaded ? prevStatus.adsWatchedToday : 0
     const prevAdsMax = prevStatus.loaded ? prevStatus.adsMaxPerDay : 0
+    const prevBestStreak = prevStatus.loaded ? prevStatus.bestStreak : 0
     if (result.ok) {
+      // Streak-награда меняет владение темой / Pro-статус — патчим оптимистично,
+      // чтобы UI на ResultScreen и MeScreen увидел изменения сразу. Полное
+      // обновление придёт через refreshTodayStatus при следующем mount.
+      const themesAfter = result.streakReward === 'theme_neon' && !prevThemes.includes('neon')
+        ? [...prevThemes, 'neon']
+        : prevThemes
+      const proAfter = result.streakReward === 'pro_30d' ? true : prevPro
+      const proExpiresAfter =
+        result.streakReward === 'pro_30d'
+          ? new Date(
+              Math.max(
+                prevProExpires ? new Date(prevProExpires).getTime() : 0,
+                Date.now(),
+              ) + 30 * 24 * 60 * 60 * 1000,
+            ).toISOString()
+          : prevProExpires
+      const newCurrentStreak = result.currentStreak
+      const newBestStreak = Math.max(prevBestStreak, newCurrentStreak)
+      if (result.streakMilestoneReached > 0) {
+        track('streak_milestone_reached', {
+          milestone: result.streakMilestoneReached,
+          reward_type: result.streakReward ?? 'none',
+          current_streak: newCurrentStreak,
+        })
+      }
       set({
         submitStatus: 'success',
         serverScore: result.score,
         doubleScoreApplied: result.doubleScoreUsed,
         submitError: null,
+        streakMilestoneReached: result.streakMilestoneReached,
+        streakReward: result.streakReward,
         // На сегодня юзер уже точно играл; кредиты могли уменьшиться
         // (если это была replay-сессия). Если буст потратился — флаг тушим.
         // Pro-статус submit-score не возвращает — сохраняем предыдущий.
@@ -318,12 +370,14 @@ export const useGameStore = create<GameState>((set, get) => ({
           loaded: true,
           playedToday: true,
           replayCredits: result.replayCreditsLeft,
-          themes: prevThemes,
+          themes: themesAfter,
           doubleScoreActive: false,
-          proActive: prevPro,
-          proExpiresAt: prevProExpires,
+          proActive: proAfter,
+          proExpiresAt: proExpiresAfter,
           adsWatchedToday: prevAdsCount,
           adsMaxPerDay: prevAdsMax,
+          currentStreak: newCurrentStreak,
+          bestStreak: newBestStreak,
         },
       })
     } else {
@@ -333,6 +387,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       // не записалась, double_score_date в БД остался.
       if (result.error === 'no_replay') {
         const prevDouble = prevStatus.loaded ? prevStatus.doubleScoreActive : false
+        const prevStreak = prevStatus.loaded ? prevStatus.currentStreak : 0
         set({
           submitStatus: 'error',
           submitError: result.error,
@@ -346,6 +401,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             proExpiresAt: prevProExpires,
             adsWatchedToday: prevAdsCount,
             adsMaxPerDay: prevAdsMax,
+            currentStreak: prevStreak,
+            bestStreak: prevBestStreak,
           },
         })
       } else {
@@ -385,6 +442,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         proExpiresAt: result.proExpiresAt,
         adsWatchedToday: result.adsWatchedToday,
         adsMaxPerDay: result.adsMaxPerDay,
+        currentStreak: result.currentStreak,
+        bestStreak: result.bestStreak,
       },
     })
   },

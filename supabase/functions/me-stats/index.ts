@@ -6,7 +6,8 @@
 //     bestScore: number,         // max(score) среди всех сессий
 //     totalGames: number,        // count(*)
 //     daysPlayed: number,        // distinct daily_seed (включая replay-сессии)
-//     currentStreak: number,     // последовательные UTC-дни до сегодня
+//     currentStreak: number,     // users.current_streak (single source of truth)
+//     bestStreak: number,        // users.best_streak (лучшая серия за всё время)
 //     totalWordsFound: number,   // sum(array_length(words_found, 1))
 //     longestWord: string | null // самое длинное найденное слово
 //   }
@@ -41,27 +42,6 @@ function isBody(value: unknown): value is Body {
   if (!value || typeof value !== 'object') return false;
   const v = value as Record<string, unknown>;
   return typeof v.initData === 'string';
-}
-
-// Вычисляем текущий streak: сколько последовательных UTC-дней подряд юзер
-// играл, считая от сегодня в прошлое. Если сегодня не играл, но играл вчера —
-// 0 (стрик прервался). Если играл и сегодня, и вчера — 2. И так далее.
-function computeStreak(seedSet: Set<string>): number {
-  const todayUTC = new Date();
-  todayUTC.setUTCHours(0, 0, 0, 0);
-  let streak = 0;
-  // Начинаем с сегодня. Если сегодня не играл — стрик 0.
-  for (let i = 0; i < 365; i++) {
-    const d = new Date(todayUTC);
-    d.setUTCDate(todayUTC.getUTCDate() - i);
-    const seed = d.toISOString().slice(0, 10);
-    if (seedSet.has(seed)) {
-      streak++;
-    } else {
-      break;
-    }
-  }
-  return streak;
 }
 
 Deno.serve(async (req) => {
@@ -100,7 +80,7 @@ Deno.serve(async (req) => {
 
   const { data: meRow, error: meErr } = await supabase
     .from('users')
-    .select('id')
+    .select('id, current_streak, best_streak')
     .eq('telegram_id', verified.user.id)
     .maybeSingle();
   if (meErr) {
@@ -119,6 +99,7 @@ Deno.serve(async (req) => {
       totalGames: 0,
       daysPlayed: 0,
       currentStreak: 0,
+      bestStreak: 0,
       totalWordsFound: 0,
       longestWord: null,
     });
@@ -161,7 +142,8 @@ Deno.serve(async (req) => {
     bestScore,
     totalGames: rows.length,
     daysPlayed: seedSet.size,
-    currentStreak: computeStreak(seedSet),
+    currentStreak: (meRow.current_streak as number) ?? 0,
+    bestStreak: (meRow.best_streak as number) ?? 0,
     totalWordsFound,
     longestWord,
   });

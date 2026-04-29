@@ -12,6 +12,8 @@
 //     proExpiresAt: string | null,  // ISO-таймстамп истечения Pro (null если нет)
 //     adsWatchedToday: number,      // сколько rewarded ads уже смотрел сегодня
 //     adsMaxPerDay: number,         // дневной лимит (анти-чит)
+//     currentStreak: number,        // текущая серия дней подряд (UTC)
+//     bestStreak: number,           // лучшая серия за всё время
 //   }
 //
 // Используется HomeScreen / ResultScreen / ShopScreen — для подсветки купленных
@@ -89,7 +91,9 @@ Deno.serve(async (req) => {
 
   const { data: meRow, error: meErr } = await supabase
     .from('users')
-    .select('id, replay_credits, double_score_date, ads_watched_date, ads_watched_count')
+    .select(
+      'id, replay_credits, double_score_date, ads_watched_date, ads_watched_count, current_streak, best_streak',
+    )
     .eq('telegram_id', verified.user.id)
     .maybeSingle();
   if (meErr) {
@@ -113,6 +117,8 @@ Deno.serve(async (req) => {
       proExpiresAt: null,
       adsWatchedToday: 0,
       adsMaxPerDay: ADS_MAX_PER_DAY,
+      currentStreak: 0,
+      bestStreak: 0,
     });
   }
 
@@ -197,5 +203,7 @@ Deno.serve(async (req) => {
     proExpiresAt,
     adsWatchedToday,
     adsMaxPerDay: ADS_MAX_PER_DAY,
+    currentStreak: (meRow.current_streak as number) ?? 0,
+    bestStreak: (meRow.best_streak as number) ?? 0,
   });
 });

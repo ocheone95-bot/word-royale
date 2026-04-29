@@ -1,0 +1,59 @@
+# Часовой триггер для Supabase Edge Function `daily-reminder`.
+#
+# Vercel Hobby cron ограничен одним запуском в сутки, что не подходит:
+# `daily-reminder` дёргается раз в час, фильтрует юзеров с локальным 09:00.
+# GitHub Actions schedule бесплатен и без ограничения по частоте.
+#
+# Точность: GitHub может опаздывать на 5-15 минут под нагрузкой —
+# для retention reminder это допустимо (юзер всё равно получит push в течение
+# окна локального утра). Если опоздание становится систематическим — переедем
+# на Supabase pg_cron.
+#
+# Секреты (Settings → Secrets and variables → Actions → New repository secret):
+#   - CRON_SECRET — должен совпадать с supabase secrets set CRON_SECRET=...
+#   - SUPABASE_ANON_KEY — публичный anon-ключ из Supabase project settings
+#
+# `workflow_dispatch` оставляет ручной триггер — удобно для smoke-теста
+# с GitHub UI без ожидания следующего часа.
+
+name: daily-reminder
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: daily-reminder
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST daily-reminder
+        env:
+          SUPABASE_URL: https://mqwrezfmkcektzbtxzwt.supabase.co
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "Missing CRON_SECRET or SUPABASE_ANON_KEY secret"
+            exit 1
+          fi
+          response=$(mktemp)
+          status=$(curl -sS -o "$response" -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            "${SUPABASE_URL}/functions/v1/daily-reminder")
+          echo "HTTP ${status}"
+          cat "$response"
+          echo
+          if [ "$status" != "200" ]; then
+            exit 1
+          fi
