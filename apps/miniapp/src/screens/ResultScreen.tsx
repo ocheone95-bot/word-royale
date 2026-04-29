@@ -73,6 +73,7 @@ export default function ResultScreen() {
   const doubleScoreApplied = useGameStore((s) => s.doubleScoreApplied)
   const streakMilestoneReached = useGameStore((s) => s.streakMilestoneReached)
   const streakReward = useGameStore((s) => s.streakReward)
+  const proTrialGranted = useGameStore((s) => s.proTrialGranted)
   const foundWords = useGameStore((s) => s.foundWords)
   const seed = useGameStore((s) => s.seed)
   const startGame = useGameStore((s) => s.startGame)
@@ -169,17 +170,19 @@ export default function ResultScreen() {
   }
 
   // Тёплая поза кота для хорошего результата, blanket для слабого.
-  // Milestone-streak важнее оценки скора — даже слабая партия в день стрика
-  // должна выглядеть как победа, поэтому переключаем на trophy.
+  // Milestone-streak / Pro trial важнее оценки скора — даже слабая партия
+  // должна выглядеть как победа, поэтому переключаем на trophy/pro.
   const goodResult = displayScore >= 200 && foundWords.length >= 3
   const streakInfo = describeStreakReward(streakMilestoneReached, streakReward)
-  const catPose = streakInfo
-    ? 'trophy'
-    : goodResult
+  const catPose = proTrialGranted
+    ? 'pro'
+    : streakInfo
       ? 'trophy'
-      : foundWords.length === 0
-        ? 'blanket'
-        : 'proud'
+      : goodResult
+        ? 'trophy'
+        : foundWords.length === 0
+          ? 'blanket'
+          : 'proud'
 
   return (
     <main
@@ -337,6 +340,55 @@ export default function ResultScreen() {
             }}
           >
             {streakInfo.reward}
+          </div>
+        </Card>
+      )}
+
+      {proTrialGranted && (
+        <Card
+          surface="leather"
+          padding={12}
+          style={{
+            marginTop: 14,
+            border: '1.5px solid var(--accent-brass)',
+            boxShadow:
+              '0 0 22px rgba(212,168,73,0.4), inset 0 0 14px rgba(255,140,66,0.12)',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'var(--font-pixel)',
+              fontSize: 10,
+              letterSpacing: 2,
+              color: 'var(--accent-brass-hi)',
+              textTransform: 'uppercase',
+            }}
+          >
+            ♛ Word Pro unlocked
+          </div>
+          <div
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 22,
+              color: 'var(--accent-lamp)',
+              marginTop: 4,
+              textShadow: '0 0 10px rgba(255,140,66,0.55)',
+            }}
+          >
+            Free 24-hour trial
+          </div>
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 13,
+              fontWeight: 700,
+              color: 'var(--text-parchment)',
+              marginTop: 6,
+              lineHeight: 1.4,
+            }}
+          >
+            Unlimited replays · all themes
           </div>
         </Card>
       )}

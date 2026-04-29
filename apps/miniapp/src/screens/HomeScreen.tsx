@@ -94,6 +94,8 @@ export default function HomeScreen() {
   const playedToday = todayStatus.loaded ? todayStatus.playedToday : false
   const replayCredits = todayStatus.loaded ? todayStatus.replayCredits : 0
   const proActive = todayStatus.loaded && todayStatus.proActive
+  const proExpiresAt = todayStatus.loaded ? todayStatus.proExpiresAt : null
+  const proTrialActive = todayStatus.loaded && todayStatus.proTrialActive
   const adsWatchedToday = todayStatus.loaded ? todayStatus.adsWatchedToday : 0
   const adsMaxPerDay = todayStatus.loaded ? todayStatus.adsMaxPerDay : 0
   const currentStreak = todayStatus.loaded ? todayStatus.currentStreak : 0
@@ -188,7 +190,11 @@ export default function HomeScreen() {
       >
         {currentStreak > 0 ? <StreakChip days={currentStreak} /> : <span />}
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          {proActive && <ProBadge />}
+          {proTrialActive ? (
+            <ProTrialPill expiresAt={proExpiresAt} />
+          ) : (
+            proActive && <ProBadge />
+          )}
           <button
             type="button"
             onClick={handleToggleSound}
@@ -420,6 +426,52 @@ export default function HomeScreen() {
         </Card>
       </div>
     </main>
+  )
+}
+
+// Pill для Pro free trial: «Pro trial · Xh Ym left». Brass-glow как у
+// ProBadge, но с явным countdown — толкает юзера купить до истечения.
+// Если осталось < 1 минуты, показываем «expiring», без отрицательных значений.
+function ProTrialPill({ expiresAt }: { expiresAt: string | null }) {
+  const [, force] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => force((n) => n + 1), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  if (!expiresAt) return null
+  const diff = new Date(expiresAt).getTime() - Date.now()
+  const totalMin = Math.max(0, Math.floor(diff / 60_000))
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  const label =
+    totalMin <= 0
+      ? 'expiring'
+      : h > 0
+        ? `${h}h ${m.toString().padStart(2, '0')}m left`
+        : `${m}m left`
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '5px 10px',
+        background: 'rgba(212,168,73,0.18)',
+        border: '1px solid var(--accent-brass)',
+        borderRadius: 999,
+        boxShadow: '0 0 10px rgba(212,168,73,0.35)',
+        color: 'var(--accent-brass-hi)',
+        fontFamily: 'var(--font-pixel)',
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: 1.4,
+        textTransform: 'uppercase',
+        lineHeight: 1,
+      }}
+    >
+      <span style={{ color: 'var(--accent-lamp)' }}>♛</span>
+      Pro trial · {label}
+    </span>
   )
 }
 

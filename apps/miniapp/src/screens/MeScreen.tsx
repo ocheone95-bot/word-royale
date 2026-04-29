@@ -95,6 +95,7 @@ export default function MeScreen() {
   const doubleScoreActive = todayStatus.loaded && todayStatus.doubleScoreActive
   const proActive = todayStatus.loaded && todayStatus.proActive
   const proExpiresAt = todayStatus.loaded ? todayStatus.proExpiresAt : null
+  const proTrialActive = todayStatus.loaded && todayStatus.proTrialActive
   const adsWatchedToday = todayStatus.loaded ? todayStatus.adsWatchedToday : 0
   const adsMaxPerDay = todayStatus.loaded ? todayStatus.adsMaxPerDay : 0
 
@@ -261,9 +262,11 @@ export default function MeScreen() {
         <StatRow
           label="Word Pro"
           value={
-            proActive
-              ? `Until ${formatProExpiry(proExpiresAt)}`
-              : 'Free tier'
+            proTrialActive
+              ? `Trial · until ${formatProExpiry(proExpiresAt)}`
+              : proActive
+                ? `Until ${formatProExpiry(proExpiresAt)}`
+                : 'Free tier'
           }
           highlight={proActive}
         />
