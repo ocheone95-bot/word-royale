@@ -1,10 +1,7 @@
-// Shop-экран. Saloon-redesign Phase D: Mostaccio в роли торговца указывает
-// на витрину, секции (Replay/Themes/Boosts/Subscription) — Card, кнопки —
-// SaloonButton, превью тем — мини-тайлы в палитрах будущих тем (Phase D/2
-// переключит весь UI через [data-theme="..."] override на design-tokens).
-//
-// Логика покупок не менялась: deep-link в бот → Stars-инвойс → webhook → RPC,
-// today-status подтягивается на маунте и при visibilitychange после возврата.
+// Shop-экран. Сессия 14: новый grid-layout по handoff'у Claude Design Phase 3.
+// Pro hero сверху как фокальная карточка, themes 2×2 grid с большой R-буквой
+// в палитре каждой темы, replay tiers (1×/8×/12×) одной строкой, Boosts ниже.
+// Neo-Tokyo как 5-я тема — отдельная full-width карточка под grid.
 
 import { useEffect } from 'react'
 import { useRawInitData } from '@telegram-apps/sdk-react'
@@ -18,7 +15,6 @@ import { openTelegramLink } from '../lib/telegram'
 import { track } from '../lib/analytics'
 import { hapticImpact } from '../lib/haptics'
 import { useDayRollover } from '../hooks/useDayRollover'
-import { Mostaccio } from '../components/Mostaccio'
 import {
   Card,
   ProBadge,
@@ -29,6 +25,8 @@ import {
 import { t, useLang } from '../lib/i18n'
 
 const REPLAY_PRICE_STARS = 50
+const REPLAY_8_PRICE_STARS = 200
+const REPLAY_12_PRICE_STARS = 400
 const THEME_PRICE_STARS = 100
 const DOUBLE_SCORE_PRICE_STARS = 200
 const PRO_PRICE_STARS = 150
@@ -36,9 +34,6 @@ const PRO_PRICE_STARS = 150
 interface ThemeCatalogEntry {
   id: ThemeId
   title: string
-  // Внутреннее имя «комнаты» из handoff'а — дублируется в design-tokens
-  // оверрайдах на Шаге 2. Названия в UI оставляем дружелюбные (Classic/Neon/…)
-  // чтобы не ломать ассоциацию с product_id, под которые юзеры покупали.
   flavour: string
   description: string
   preview: ThemePalette
@@ -52,76 +47,82 @@ interface ThemePalette {
   glow: string
 }
 
-// Палитры из handoff'а phase5.jsx THEME_PRESETS + Neo-Tokyo (5-я тема).
-// Эти же значения на Шаге 2 переедут в design-tokens.css как [data-theme]
-// блоки. Неважно, что часть «комнаты» (bg-room, brass и т.п.) тут не видна —
-// хватает основных трёх: фон тайла, граница, glow.
-const THEME_CATALOG: readonly ThemeCatalogEntry[] = [
-  {
-    id: 'default',
-    title: 'Classic',
-    flavour: 'The Saloon · default',
-    description: 'Warm amber lamps and brass accents.',
-    preview: {
-      bgInner: '#3a2818',
-      bgOuter: '#0a0604',
-      border: '#d4a849',
-      text: '#f4e4bc',
-      glow: '#ffb84d',
-    },
+const SALOON_THEME: ThemeCatalogEntry = {
+  id: 'default',
+  title: 'Saloon',
+  flavour: 'default',
+  description: 'Warm amber lamps and brass accents.',
+  preview: {
+    bgInner: '#3a2818',
+    bgOuter: '#0a0604',
+    border: '#d4a849',
+    text: '#f4e4bc',
+    glow: '#ffb84d',
   },
-  {
-    id: 'neon',
-    title: 'Neon',
-    flavour: 'The Arcade',
-    description: 'Cyan glow on midnight blue.',
-    preview: {
-      bgInner: '#15182c',
-      bgOuter: '#04031a',
-      border: '#42d4ff',
-      text: '#9adfff',
-      glow: '#42d4ff',
-    },
+}
+
+const NEON_THEME: ThemeCatalogEntry = {
+  id: 'neon',
+  title: 'Late Arcade',
+  flavour: 'Neon',
+  description: 'Cyan glow on midnight blue.',
+  preview: {
+    bgInner: '#15182c',
+    bgOuter: '#04031a',
+    border: '#42d4ff',
+    text: '#9adfff',
+    glow: '#42d4ff',
   },
-  {
-    id: 'retro',
-    title: 'Retro',
-    flavour: 'The Diner ’74',
-    description: 'Mustard sign over sienna walls.',
-    preview: {
-      bgInner: '#5a2010',
-      bgOuter: '#1a0c04',
-      border: '#f4c542',
-      text: '#f4e4bc',
-      glow: '#c4541f',
-    },
+}
+
+const RETRO_THEME: ThemeCatalogEntry = {
+  id: 'retro',
+  title: "Diner '74",
+  flavour: 'Retro',
+  description: 'Mustard sign over sienna walls.',
+  preview: {
+    bgInner: '#5a2010',
+    bgOuter: '#1a0c04',
+    border: '#f4c542',
+    text: '#f4e4bc',
+    glow: '#c4541f',
   },
-  {
-    id: 'sakura',
-    title: 'Sakura',
-    flavour: 'Kyoto',
-    description: 'Cherry-blossom pink on dark wood.',
-    preview: {
-      bgInner: '#5a2840',
-      bgOuter: '#0a0508',
-      border: '#ffb8d4',
-      text: '#f4e4bc',
-      glow: '#c44878',
-    },
+}
+
+const SAKURA_THEME: ThemeCatalogEntry = {
+  id: 'sakura',
+  title: 'Kyoto',
+  flavour: 'Sakura',
+  description: 'Cherry-blossom pink on dark wood.',
+  preview: {
+    bgInner: '#5a2840',
+    bgOuter: '#0a0508',
+    border: '#ffb8d4',
+    text: '#f4e4bc',
+    glow: '#c44878',
   },
-  {
-    id: 'cyberpunk',
-    title: 'Cyberpunk',
-    flavour: 'Neo-Tokyo',
-    description: 'Magenta + electric yellow on void.',
-    preview: {
-      bgInner: '#0a0010',
-      bgOuter: '#000000',
-      border: '#ff00ff',
-      text: '#ffff00',
-      glow: '#ff00ff',
-    },
+}
+
+const NEO_TOKYO_THEME: ThemeCatalogEntry = {
+  id: 'cyberpunk',
+  title: 'Neo-Tokyo',
+  flavour: 'Cyberpunk',
+  description: 'Magenta + electric yellow on void.',
+  preview: {
+    bgInner: '#0a0010',
+    bgOuter: '#000000',
+    border: '#ff00ff',
+    text: '#ffff00',
+    glow: '#ff00ff',
   },
+}
+
+// Основные 4 темы в 2×2 grid + Neo-Tokyo как 5-я отдельной картой ниже.
+const MAIN_THEMES: readonly ThemeCatalogEntry[] = [
+  SALOON_THEME,
+  NEON_THEME,
+  RETRO_THEME,
+  SAKURA_THEME,
 ] as const
 
 export default function ShopScreen() {
@@ -145,20 +146,28 @@ export default function ShopScreen() {
   }, [initData, refreshTodayStatus])
   useDayRollover(initData ?? undefined)
 
-  const replayCredits = todayStatus.loaded ? todayStatus.replayCredits : 0
   const ownedThemes = todayStatus.loaded ? todayStatus.themes : []
   const doubleScoreActive = todayStatus.loaded && todayStatus.doubleScoreActive
   const proActive = todayStatus.loaded && todayStatus.proActive
   const proExpiresAt = todayStatus.loaded ? todayStatus.proExpiresAt : null
 
-  const handleBuyReplay = () => {
+  const handleBuyReplay = (productId: 'replay' | 'replay_8' | 'replay_12') => {
     hapticImpact('medium')
+    const priceMap = {
+      replay: REPLAY_PRICE_STARS,
+      replay_8: REPLAY_8_PRICE_STARS,
+      replay_12: REPLAY_12_PRICE_STARS,
+    }
     track('iap_initiated', {
-      product_id: 'replay',
-      price_stars: REPLAY_PRICE_STARS,
+      product_id: productId,
+      price_stars: priceMap[productId],
       source: 'shop',
     })
-    openTelegramLink(buildBuyReplayDeepLink())
+    openTelegramLink(
+      productId === 'replay'
+        ? buildBuyReplayDeepLink()
+        : buildBuyDeepLink(productId),
+    )
   }
   const handleBuyTheme = (id: ThemeId) => {
     hapticImpact('medium')
@@ -255,88 +264,73 @@ export default function ShopScreen() {
         {proActive ? <ProBadge /> : <span style={{ width: 40 }} />}
       </header>
 
+      {/* Pro hero — фокальная карточка наверху. Радиальный glow в углу
+          плюс корона; CTA «BECOME PRO» при неактивной подписке, «Active until …»
+          при активной. */}
+      <ProHero active={proActive} expiresAt={proExpiresAt} onBuy={handleBuyPro} />
+
+      <SectionTitle>{t('shop.themes_section')}</SectionTitle>
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'center',
-          marginTop: 12,
-          marginBottom: 4,
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 10,
         }}
       >
-        <Mostaccio pose="point" scale={3} />
+        {MAIN_THEMES.map((theme) => (
+          <ThemeGridCard
+            key={theme.id}
+            theme={theme}
+            owned={theme.id === 'default' || ownedThemes.includes(theme.id)}
+            active={selectedTheme === theme.id}
+            proActive={proActive}
+            onApply={() => handleApplyTheme(theme.id)}
+            onBuy={() => handleBuyTheme(theme.id)}
+          />
+        ))}
       </div>
 
-      <p
-        style={{
-          fontFamily: 'var(--font-pixel)',
-          fontSize: 11,
-          color: 'var(--text-ash)',
-          letterSpacing: 1.5,
-          textTransform: 'uppercase',
-          textAlign: 'center',
-          marginTop: 0,
-          marginBottom: 18,
-        }}
-      >
-        — Mostaccio’s general store —
-      </p>
-
-      {/* Pro hero — поднят наверх. Anchoring: юзер видит самую сильную */}
-      {/* ценность ($2.55 безлимит + все темы) первой, Replay в конце как */}
-      {/* отдельный SKU «доиграть один раз». */}
-      <Section title={t('shop.subscription_section')}>
-        <ProCard
-          active={proActive}
-          expiresAt={proExpiresAt}
-          onBuy={handleBuyPro}
+      <div style={{ marginTop: 10 }}>
+        <ThemeWideCard
+          theme={NEO_TOKYO_THEME}
+          owned={ownedThemes.includes(NEO_TOKYO_THEME.id)}
+          active={selectedTheme === NEO_TOKYO_THEME.id}
+          proActive={proActive}
+          onApply={() => handleApplyTheme(NEO_TOKYO_THEME.id)}
+          onBuy={() => handleBuyTheme(NEO_TOKYO_THEME.id)}
         />
-      </Section>
+      </div>
 
-      <Section title={t('shop.themes_section')}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {THEME_CATALOG.map((theme) => (
-            <ThemeCard
-              key={theme.id}
-              theme={theme}
-              owned={theme.id === 'default' || ownedThemes.includes(theme.id)}
-              active={selectedTheme === theme.id}
-              proActive={proActive}
-              onApply={() => handleApplyTheme(theme.id)}
-              onBuy={() => handleBuyTheme(theme.id)}
-            />
-          ))}
-        </div>
-      </Section>
-
-      <Section title={t('shop.boosts_section')}>
-        <ShopCard
-          title="Double Score"
-          description={t('shop.double_score_desc')}
-          badge={doubleScoreActive ? t('shop.double_score_active') : null}
-          buyLabel={t('shop.double_score_buy', { price: DOUBLE_SCORE_PRICE_STARS })}
-          onBuy={handleBuyDoubleScore}
+      <SectionTitle>{t('shop.replay_section')}</SectionTitle>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <ReplayTier
+          qty={1}
+          price={REPLAY_PRICE_STARS}
+          discount={null}
+          onBuy={() => handleBuyReplay('replay')}
         />
-      </Section>
-
-      <Section title={t('shop.replay_section')}>
-        <ShopCard
-          title={t('shop.replay_section')}
-          description={
-            proActive
-              ? t('shop.pro_perks_unlimited')
-              : t('shop.replay_desc')
-          }
-          badge={
-            proActive
-              ? t('shop.theme_active')
-              : replayCredits > 0
-                ? `${replayCredits} ${t('shop.theme_owned')}`
-                : null
-          }
-          buyLabel={t('shop.replay_buy', { price: REPLAY_PRICE_STARS })}
-          onBuy={handleBuyReplay}
+        <ReplayTier
+          qty={8}
+          price={REPLAY_8_PRICE_STARS}
+          discount="−50%"
+          onBuy={() => handleBuyReplay('replay_8')}
         />
-      </Section>
+        <ReplayTier
+          qty={12}
+          price={REPLAY_12_PRICE_STARS}
+          discount="−33%"
+          onBuy={() => handleBuyReplay('replay_12')}
+        />
+      </div>
+
+      <SectionTitle>{t('shop.boosts_section')}</SectionTitle>
+      <ShopCard
+        title="Double Score"
+        description={t('shop.double_score_desc')}
+        badge={doubleScoreActive ? t('shop.double_score_active') : null}
+        buyLabel={t('shop.double_score_buy', { price: DOUBLE_SCORE_PRICE_STARS })}
+        onBuy={handleBuyDoubleScore}
+      />
 
       <div
         style={{
@@ -355,36 +349,455 @@ export default function ShopScreen() {
   )
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
+function SectionTitle({ children }: { children: string }) {
   return (
-    <section style={{ marginBottom: 18 }}>
-      <h2
+    <h2
+      style={{
+        fontFamily: 'var(--font-pixel)',
+        fontSize: 11,
+        color: 'var(--accent-brass)',
+        letterSpacing: 2,
+        textTransform: 'uppercase',
+        margin: '20px 0 10px 4px',
+      }}
+    >
+      {children}
+    </h2>
+  )
+}
+
+interface ProHeroProps {
+  active: boolean
+  expiresAt: string | null
+  onBuy: () => void
+}
+
+function ProHero({ active, expiresAt, onBuy }: ProHeroProps) {
+  const expiryLabel =
+    active && expiresAt
+      ? new Date(expiresAt).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+        })
+      : null
+  return (
+    <div
+      style={{
+        position: 'relative',
+        background: 'linear-gradient(180deg, #3a2818 0%, #1a1108 100%)',
+        borderRadius: 14,
+        border: '1.5px solid rgba(212,168,73,0.7)',
+        boxShadow:
+          '0 0 22px rgba(212,168,73,0.35), 0 8px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)',
+        padding: '18px 18px 16px',
+        marginTop: 16,
+        color: 'var(--text-parchment)',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          top: -20,
+          right: -20,
+          width: 140,
+          height: 140,
+          borderRadius: '50%',
+          background:
+            'radial-gradient(circle, rgba(232,192,98,0.4) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }}
+      />
+      <CrownGlyph />
+
+      <div
         style={{
           fontFamily: 'var(--font-pixel)',
-          fontSize: 11,
+          fontSize: 9,
           color: 'var(--accent-brass)',
-          letterSpacing: 2,
+          letterSpacing: 2.5,
           textTransform: 'uppercase',
-          margin: '0 0 8px 4px',
+          marginTop: 4,
         }}
       >
-        {title}
-      </h2>
-      {children}
-    </section>
+        Word Royale
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 36,
+          color: 'var(--accent-brass-hi)',
+          textShadow: '0 0 12px rgba(212,168,73,0.6)',
+          margin: '2px 0 6px 0',
+          lineHeight: 1,
+          letterSpacing: 2,
+        }}
+      >
+        PRO
+      </div>
+      <p
+        style={{
+          fontFamily: 'var(--font-ui)',
+          fontSize: 12,
+          color: 'var(--text-parchment-dim)',
+          margin: '0 0 14px 0',
+          lineHeight: 1.4,
+        }}
+      >
+        {t('shop.pro_perks_unlimited')} · {t('shop.pro_perks_themes')} ·{' '}
+        {t('shop.pro_perks_pro_board')} · {t('shop.pro_perks_no_ads')}
+      </p>
+
+      {active && expiryLabel ? (
+        <div
+          style={{
+            display: 'inline-block',
+            fontFamily: 'var(--font-pixel)',
+            fontSize: 10,
+            letterSpacing: 1.5,
+            color: 'var(--accent-brass-hi)',
+            textTransform: 'uppercase',
+            background: 'rgba(212,168,73,0.18)',
+            border: '1px solid rgba(212,168,73,0.4)',
+            borderRadius: 999,
+            padding: '6px 14px',
+            marginTop: 4,
+          }}
+        >
+          {t('shop.pro_active_until', { date: expiryLabel })}
+        </div>
+      ) : (
+        <SaloonButton variant="primary" size="md" fullWidth onClick={onBuy}>
+          {t('shop.pro_buy', { price: PRO_PRICE_STARS })}
+        </SaloonButton>
+      )}
+    </div>
+  )
+}
+
+// Pixel-корона в углу Pro-карточки. SVG с glow.
+function CrownGlyph() {
+  return (
+    <svg
+      width="28"
+      height="22"
+      viewBox="0 0 28 22"
+      style={{
+        position: 'absolute',
+        top: 14,
+        right: 16,
+        filter: 'drop-shadow(0 0 6px rgba(212,168,73,0.6))',
+      }}
+      aria-hidden
+    >
+      <path
+        d="M2 8 L2 18 L26 18 L26 8 L20 12 L14 4 L8 12 Z"
+        fill="var(--accent-brass-hi)"
+        stroke="var(--accent-brass)"
+        strokeWidth="1"
+      />
+    </svg>
+  )
+}
+
+interface ThemeGridCardProps {
+  theme: ThemeCatalogEntry
+  owned: boolean
+  active: boolean
+  proActive: boolean
+  onApply: () => void
+  onBuy: () => void
+}
+
+function ThemeGridCard({
+  theme,
+  owned,
+  active,
+  proActive,
+  onApply,
+  onBuy,
+}: ThemeGridCardProps) {
+  const accessible = owned || proActive
+  const handleClick = () => {
+    if (active) return
+    if (accessible) onApply()
+    else onBuy()
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={active}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 8,
+        padding: '16px 10px 12px',
+        background: `radial-gradient(circle at 50% 35%, ${theme.preview.bgInner} 0%, ${theme.preview.bgOuter} 95%)`,
+        border: active
+          ? `2px solid ${theme.preview.border}`
+          : '1px solid rgba(212,168,73,0.25)',
+        borderRadius: 12,
+        boxShadow: active
+          ? `0 0 18px ${hexAlpha(theme.preview.glow, 0.55)}, 0 6px 12px rgba(0,0,0,0.35)`
+          : '0 4px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)',
+        color: 'var(--text-parchment)',
+        cursor: active ? 'default' : 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        transition: 'transform 120ms ease-out, box-shadow 120ms ease-out',
+      }}
+    >
+      <div
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: '50%',
+          border: `3px solid ${theme.preview.border}`,
+          background: `radial-gradient(circle at 38% 32%, ${theme.preview.bgInner} 0%, ${theme.preview.bgOuter} 95%)`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'var(--font-pixel)',
+          fontWeight: 700,
+          fontSize: 32,
+          color: theme.preview.text,
+          textShadow: `0 0 6px ${theme.preview.glow}, 0 0 14px ${theme.preview.glow}`,
+          boxShadow: [
+            '0 4px 0 rgba(0,0,0,.5)',
+            'inset 0 -3px 8px rgba(0,0,0,.65)',
+            'inset 0 2px 4px rgba(255,255,255,.18)',
+          ].join(', '),
+          lineHeight: 1,
+        }}
+      >
+        R
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 15,
+          color: 'var(--text-parchment)',
+          lineHeight: 1.1,
+          textAlign: 'center',
+        }}
+      >
+        {theme.title}
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--font-pixel)',
+          fontSize: 9,
+          color: theme.preview.border,
+          letterSpacing: 1.2,
+          textTransform: 'uppercase',
+        }}
+      >
+        {active
+          ? t('shop.theme_active')
+          : owned
+            ? `${t('shop.theme_owned')}${theme.id === 'default' ? ' · default' : ''}`
+            : `${THEME_PRICE_STARS}⭐`}
+      </div>
+    </button>
+  )
+}
+
+interface ThemeWideCardProps extends ThemeGridCardProps {}
+
+function ThemeWideCard({
+  theme,
+  owned,
+  active,
+  proActive,
+  onApply,
+  onBuy,
+}: ThemeWideCardProps) {
+  const accessible = owned || proActive
+  const handleClick = () => {
+    if (active) return
+    if (accessible) onApply()
+    else onBuy()
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={active}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        width: '100%',
+        padding: '12px 14px',
+        background: `linear-gradient(90deg, ${theme.preview.bgInner} 0%, ${theme.preview.bgOuter} 100%)`,
+        border: active
+          ? `2px solid ${theme.preview.border}`
+          : '1px solid rgba(212,168,73,0.25)',
+        borderRadius: 12,
+        boxShadow: active
+          ? `0 0 16px ${hexAlpha(theme.preview.glow, 0.5)}`
+          : '0 4px 10px rgba(0,0,0,0.35)',
+        color: 'var(--text-parchment)',
+        cursor: active ? 'default' : 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        textAlign: 'left',
+      }}
+    >
+      <div
+        style={{
+          width: 50,
+          height: 50,
+          borderRadius: '50%',
+          border: `3px solid ${theme.preview.border}`,
+          background: `radial-gradient(circle at 38% 32%, ${theme.preview.bgInner} 0%, ${theme.preview.bgOuter} 95%)`,
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'var(--font-pixel)',
+          fontWeight: 700,
+          fontSize: 24,
+          color: theme.preview.text,
+          textShadow: `0 0 6px ${theme.preview.glow}, 0 0 12px ${theme.preview.glow}`,
+        }}
+      >
+        R
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 16,
+            color: 'var(--text-parchment)',
+            lineHeight: 1.1,
+          }}
+        >
+          {theme.title}
+        </div>
+        <div
+          style={{
+            fontFamily: 'var(--font-pixel)',
+            fontSize: 9,
+            color: theme.preview.border,
+            letterSpacing: 1.2,
+            textTransform: 'uppercase',
+            marginTop: 2,
+          }}
+        >
+          {theme.flavour}
+        </div>
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--font-pixel)',
+          fontSize: 12,
+          fontWeight: 700,
+          color: active ? theme.preview.glow : 'var(--accent-brass-hi)',
+          letterSpacing: 1,
+        }}
+      >
+        {active
+          ? t('shop.theme_active')
+          : owned
+            ? t('shop.theme_owned')
+            : `${THEME_PRICE_STARS}⭐`}
+      </div>
+    </button>
+  )
+}
+
+interface ReplayTierProps {
+  qty: number
+  price: number
+  discount: string | null
+  onBuy: () => void
+}
+
+function ReplayTier({ qty, price, discount, onBuy }: ReplayTierProps) {
+  return (
+    <button
+      type="button"
+      onClick={onBuy}
+      style={{
+        position: 'relative',
+        flex: 1,
+        background: 'var(--gradient-card-table)',
+        border: '1px solid rgba(212,168,73,0.3)',
+        borderRadius: 12,
+        padding: '14px 8px 12px',
+        color: 'var(--text-parchment)',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        textAlign: 'center',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)',
+      }}
+    >
+      {discount && (
+        <span
+          style={{
+            position: 'absolute',
+            top: -8,
+            right: 6,
+            background: 'var(--accent-lamp)',
+            color: 'var(--text-charcoal)',
+            fontFamily: 'var(--font-pixel)',
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: 0.8,
+            padding: '2px 6px',
+            borderRadius: 999,
+            boxShadow: '0 0 10px rgba(255,140,66,0.55)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {discount}
+        </span>
+      )}
+      <div
+        style={{
+          fontFamily: 'var(--font-pixel)',
+          fontSize: 22,
+          color: 'var(--accent-brass-hi)',
+          textShadow: '0 0 8px rgba(212,168,73,0.4)',
+          lineHeight: 1,
+        }}
+      >
+        {qty}×
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--font-pixel)',
+          fontSize: 9,
+          color: 'var(--text-ash)',
+          letterSpacing: 1.5,
+          textTransform: 'uppercase',
+          marginTop: 4,
+        }}
+      >
+        replay
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--font-pixel)',
+          fontSize: 13,
+          fontWeight: 700,
+          color: 'var(--accent-brass-hi)',
+          marginTop: 8,
+        }}
+      >
+        {price}⭐
+      </div>
+    </button>
   )
 }
 
 interface ShopCardProps {
   title: string
   description: string
-  badge?: string | null
+  badge: string | null
   buyLabel: string
   onBuy: () => void
 }
@@ -419,7 +832,24 @@ function ShopCard({
         >
           {title}
         </h3>
-        {badge && <Badge tone="brass">{badge}</Badge>}
+        {badge && (
+          <span
+            style={{
+              fontFamily: 'var(--font-pixel)',
+              fontSize: 9,
+              letterSpacing: 1.4,
+              textTransform: 'uppercase',
+              color: 'var(--accent-brass-hi)',
+              background: 'rgba(212,168,73,0.18)',
+              border: '1px solid rgba(212,168,73,0.55)',
+              borderRadius: 999,
+              padding: '3px 8px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {badge}
+          </span>
+        )}
       </div>
       <p
         style={{
@@ -439,312 +869,14 @@ function ShopCard({
   )
 }
 
-interface ThemeCardProps {
-  theme: ThemeCatalogEntry
-  owned: boolean
-  active: boolean
-  proActive: boolean
-  onApply: () => void
-  onBuy: () => void
-}
-
-function ThemeCard({
-  theme,
-  owned,
-  active,
-  proActive,
-  onApply,
-  onBuy,
-}: ThemeCardProps) {
-  return (
-    <Card
-      surface="table"
-      padding={12}
-      style={
-        active
-          ? {
-              borderColor: 'var(--accent-lamp)',
-              boxShadow: '0 0 18px rgba(255,140,66,0.3), 0 4px 12px rgba(0,0,0,0.3)',
-            }
-          : undefined
-      }
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <ThemePreview palette={theme.preview} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              flexWrap: 'wrap',
-            }}
-          >
-            <h3
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 16,
-                fontWeight: 400,
-                margin: 0,
-                color: 'var(--text-parchment)',
-                lineHeight: 1.2,
-              }}
-            >
-              {theme.title}
-            </h3>
-            {active && <Badge tone="lamp">{t('shop.theme_active')}</Badge>}
-          </div>
-          <p
-            style={{
-              fontFamily: 'var(--font-pixel)',
-              fontSize: 9,
-              color: 'var(--text-ash)',
-              letterSpacing: 1,
-              textTransform: 'uppercase',
-              margin: '2px 0 2px 0',
-            }}
-          >
-            {theme.flavour}
-          </p>
-          <p
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: 12,
-              color: 'var(--text-parchment-dim)',
-              margin: 0,
-              lineHeight: 1.35,
-            }}
-          >
-            {theme.description}
-          </p>
-        </div>
-      </div>
-      <div style={{ marginTop: 10 }}>
-        {owned || proActive ? (
-          <SaloonButton
-            variant={active ? 'ghost' : 'secondary'}
-            size="sm"
-            fullWidth
-            onClick={active ? undefined : onApply}
-            disabled={active}
-          >
-            {active ? `✓ ${t('shop.theme_active')}` : t('shop.theme_apply')}
-          </SaloonButton>
-        ) : (
-          <SaloonButton variant="primary" size="sm" fullWidth onClick={onBuy}>
-            {t('shop.theme_buy', { price: THEME_PRICE_STARS })}
-          </SaloonButton>
-        )}
-      </div>
-    </Card>
-  )
-}
-
-// Маленький круглый preview-тайл темы. Использует цвета палитры темы напрямую,
-// не CSS-переменные — чтобы каждая карточка могла показать СВОЙ стиль на одном
-// экране (CSS-переменные применяются глобально через [data-theme]).
-function ThemePreview({ palette }: { palette: ThemePalette }) {
-  return (
-    <div
-      style={{
-        width: 56,
-        height: 56,
-        borderRadius: '50%',
-        flexShrink: 0,
-        border: `3px solid ${palette.border}`,
-        background: `radial-gradient(circle at 38% 32%, ${palette.bgInner} 0%, ${palette.bgOuter} 95%)`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: 'var(--font-pixel)',
-        fontWeight: 700,
-        fontSize: 26,
-        color: palette.text,
-        textShadow: `0 0 6px ${palette.glow}, 0 0 14px ${palette.glow}`,
-        boxShadow: [
-          '0 4px 0 rgba(0,0,0,.5)',
-          'inset 0 -3px 8px rgba(0,0,0,.65)',
-          'inset 0 2px 4px rgba(255,255,255,.18)',
-        ].join(', '),
-        lineHeight: 1,
-      }}
-    >
-      A
-    </div>
-  )
-}
-
-interface ProCardProps {
-  active: boolean
-  expiresAt: string | null
-  onBuy: () => void
-}
-
-// Premium-карточка для подписки. Brass-gold trim, корона в уголке,
-// контрастно сильнее обычных Card'ов чтобы не теряться в списке.
-function ProCard({ active, expiresAt, onBuy }: ProCardProps) {
-  const expiryLabel =
-    active && expiresAt
-      ? new Date(expiresAt).toLocaleDateString(undefined, {
-          month: 'short',
-          day: 'numeric',
-        })
-      : null
-  return (
-    <div
-      style={{
-        position: 'relative',
-        background: 'linear-gradient(180deg, #3a2818 0%, #1a1108 100%)',
-        borderRadius: 14,
-        border: '1.5px solid rgba(212,168,73,0.7)',
-        boxShadow:
-          '0 0 18px rgba(212,168,73,0.25), 0 6px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)',
-        padding: 16,
-        color: 'var(--text-parchment)',
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          top: -14,
-          right: -14,
-          width: 80,
-          height: 80,
-          borderRadius: '50%',
-          background:
-            'radial-gradient(circle, rgba(232,192,98,0.35) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }}
-      />
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          gap: 8,
-          marginBottom: 6,
-        }}
-      >
-        <div>
-          <h3
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 22,
-              fontWeight: 400,
-              margin: 0,
-              color: 'var(--accent-brass-hi)',
-              textShadow: '0 0 10px rgba(212,168,73,0.5)',
-              lineHeight: 1.1,
-            }}
-          >
-            {t('shop.pro_title')}
-          </h3>
-          <p
-            style={{
-              fontFamily: 'var(--font-pixel)',
-              fontSize: 10,
-              color: 'var(--accent-brass)',
-              letterSpacing: 2,
-              textTransform: 'uppercase',
-              margin: '4px 0 0 0',
-            }}
-          >
-            {t('shop.pro_price', { price: PRO_PRICE_STARS })}
-          </p>
-        </div>
-        <ProBadge />
-      </div>
-      <ul
-        style={{
-          listStyle: 'none',
-          padding: 0,
-          margin: '12px 0 14px 0',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 4,
-        }}
-      >
-        {[
-          t('shop.pro_perks_unlimited'),
-          t('shop.pro_perks_themes'),
-          t('shop.pro_perks_pro_board'),
-          t('shop.pro_perks_no_ads'),
-        ].map((line) => (
-          <li
-            key={line}
-            style={{
-              display: 'flex',
-              gap: 8,
-              fontFamily: 'var(--font-ui)',
-              fontSize: 13,
-              color: 'var(--text-parchment-dim)',
-              lineHeight: 1.4,
-            }}
-          >
-            <span style={{ color: 'var(--accent-brass-hi)' }}>★</span>
-            {line}
-          </li>
-        ))}
-      </ul>
-      {active && expiryLabel && (
-        <div
-          style={{
-            display: 'inline-block',
-            fontFamily: 'var(--font-pixel)',
-            fontSize: 10,
-            letterSpacing: 1.5,
-            color: 'var(--accent-brass-hi)',
-            textTransform: 'uppercase',
-            background: 'rgba(212,168,73,0.15)',
-            border: '1px solid rgba(212,168,73,0.4)',
-            borderRadius: 999,
-            padding: '4px 10px',
-            marginBottom: 12,
-          }}
-        >
-          {t('shop.pro_active_until', { date: expiryLabel })}
-        </div>
-      )}
-      <SaloonButton variant="primary" size="md" fullWidth onClick={onBuy}>
-        {t('shop.pro_buy', { price: PRO_PRICE_STARS })}
-      </SaloonButton>
-    </div>
-  )
-}
-
-// Бейдж в углу карточки. Два тона: brass (нейтральный «у вас уже есть»)
-// и lamp (огненный — «эта тема прямо сейчас активна»).
-function Badge({
-  children,
-  tone,
-}: {
-  children: React.ReactNode
-  tone: 'brass' | 'lamp'
-}) {
-  const isLamp = tone === 'lamp'
-  return (
-    <span
-      style={{
-        fontFamily: 'var(--font-pixel)',
-        fontSize: 9,
-        letterSpacing: 1.4,
-        textTransform: 'uppercase',
-        color: isLamp ? 'var(--accent-lamp-hi)' : 'var(--accent-brass-hi)',
-        background: isLamp
-          ? 'rgba(255,140,66,0.18)'
-          : 'rgba(212,168,73,0.18)',
-        border: isLamp
-          ? '1px solid rgba(255,140,66,0.55)'
-          : '1px solid rgba(212,168,73,0.55)',
-        borderRadius: 999,
-        padding: '3px 8px',
-        whiteSpace: 'nowrap',
-        flexShrink: 0,
-      }}
-    >
-      {children}
-    </span>
-  )
+// Утилита: hex (#rrggbb) → rgba с указанной alpha. Для glow-shadow на
+// theme-картах, чтобы не плодить ad-hoc rgba-литералы.
+function hexAlpha(hex: string, alpha: number): string {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex)
+  if (!m) return hex
+  const intVal = parseInt(m[1], 16)
+  const r = (intVal >> 16) & 0xff
+  const g = (intVal >> 8) & 0xff
+  const b = intVal & 0xff
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }

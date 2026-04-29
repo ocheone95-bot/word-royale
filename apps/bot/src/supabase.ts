@@ -23,12 +23,15 @@ export function getSupabase(): SupabaseClient {
 
 // Атомарно: upsert юзера + запись в purchases + инкремент replay_credits.
 // Возвращает was_new=false, если этот telegram_payment_id уже обрабатывался.
+// productId: 'replay' (1 кредит) | 'replay_8' (8 кредитов) | 'replay_12' (12).
 export async function grantReplayCredit(params: {
   telegramId: number;
   username: string | null;
   firstName: string | null;
   telegramPaymentId: string;
   starsAmount: number;
+  productId?: 'replay' | 'replay_8' | 'replay_12';
+  qty?: number;
 }): Promise<{ userId: string; wasNew: boolean }> {
   const { data, error } = await getSupabase().rpc('grant_replay_credit', {
     p_telegram_id: params.telegramId,
@@ -36,6 +39,8 @@ export async function grantReplayCredit(params: {
     p_first_name: params.firstName,
     p_telegram_payment_id: params.telegramPaymentId,
     p_stars_amount: params.starsAmount,
+    p_product_id: params.productId ?? 'replay',
+    p_qty: params.qty ?? 1,
   });
 
   if (error) throw error;

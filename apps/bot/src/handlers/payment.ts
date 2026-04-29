@@ -11,6 +11,7 @@ import {
   getProduct,
   isThemeProductId,
   themeIdFromProductId,
+  REPLAY_BUNDLE_QTY,
 } from '../products.js';
 import { parseInvoicePayload } from './buy.js';
 import {
@@ -110,8 +111,16 @@ export function registerPaymentHandlers(bot: Bot): void {
     const lang = detectBotLang(from.language_code ?? null);
 
     try {
-      if (parsed.productId === 'replay') {
-        const result = await grantReplayCredit(grantBase);
+      if (
+        parsed.productId === 'replay' ||
+        parsed.productId === 'replay_8' ||
+        parsed.productId === 'replay_12'
+      ) {
+        const result = await grantReplayCredit({
+          ...grantBase,
+          productId: parsed.productId,
+          qty: REPLAY_BUNDLE_QTY[parsed.productId],
+        });
         wasNew = result.wasNew;
         successText = bt('payment_replay_success', lang);
       } else if (parsed.productId === 'double_score') {

@@ -13,9 +13,19 @@ export const THEME_IDS: readonly ThemeId[] = [
 
 export type ProductId =
   | 'replay'
+  | 'replay_8'
+  | 'replay_12'
   | 'double_score'
   | 'pro_subscription'
   | `theme_${ThemeId}`;
+
+// Сколько replay-credits начисляется за каждый bundle. Используется в
+// payment.ts при successful_payment.
+export const REPLAY_BUNDLE_QTY: Record<'replay' | 'replay_8' | 'replay_12', number> = {
+  replay: 1,
+  replay_8: 8,
+  replay_12: 12,
+};
 
 export interface Product {
   id: ProductId;
@@ -30,6 +40,18 @@ export const PRODUCTS: Record<ProductId, Product> = {
     title: 'Extra game today',
     description: "Play today's puzzle one more time and try to beat your score.",
     starsAmount: 50,
+  },
+  replay_8: {
+    id: 'replay_8',
+    title: '8× replay bundle',
+    description: '8 extra games — save vs buying single replays.',
+    starsAmount: 200,
+  },
+  replay_12: {
+    id: 'replay_12',
+    title: '12× replay bundle',
+    description: '12 extra games — biggest savings.',
+    starsAmount: 400,
   },
   double_score: {
     id: 'double_score',
